@@ -6,6 +6,8 @@ configuration classes, and other foundational components used
 throughout the framework.
 """
 
+
+from .configuration import Configuration
 from .exceptions import (
     AIWeatherError,
     CacheError,
@@ -21,6 +23,7 @@ from .exceptions import (
 from .states import ForecastStatus
 
 __all__ = [
+    "Configuration",
     "ForecastStatus",
     "AIWeatherError",
     "ConfigurationError",
