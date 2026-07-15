@@ -6,7 +6,12 @@ configuration classes, and other foundational components used
 throughout the framework.
 """
 
-
+from .metadata import (
+    DatasetInfo,
+    DomainInfo,
+    RuntimeInfo,
+    ForecastMetadata,
+)
 from .configuration import Configuration
 from .exceptions import (
     AIWeatherError,
@@ -23,6 +28,10 @@ from .exceptions import (
 from .states import ForecastStatus
 
 __all__ = [
+    "DatasetInfo",
+    "DomainInfo",
+    "RuntimeInfo",
+    "ForecastMetadata",
     "Configuration",
     "ForecastStatus",
     "AIWeatherError",
