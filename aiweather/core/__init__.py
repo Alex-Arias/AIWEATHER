@@ -1,16 +1,35 @@
 """
-AIWeather Core Package.
+Core classes and utilities for AIWeather.
 
-This package contains the fundamental classes and utilities shared
-by every AIWeather forecasting model and workflow.
-
-As the framework evolves, this package will provide the common API
-used by GraphCast, AIFS, AIFS2, Aurora, FengWu, StormCast, Pangu,
-and future AI weather prediction models.
+The core package contains common enumerations, exceptions, metadata,
+configuration classes, and other foundational components used
+throughout the framework.
 """
 
+from .exceptions import (
+    AIWeatherError,
+    CacheError,
+    ConfigurationError,
+    DatasetError,
+    DownloadError,
+    ExportError,
+    ForecastError,
+    HPCError,
+    ModelError,
+    VerificationError,
+)
 from .states import ForecastStatus
 
 __all__ = [
     "ForecastStatus",
+    "AIWeatherError",
+    "ConfigurationError",
+    "DatasetError",
+    "DownloadError",
+    "CacheError",
+    "ModelError",
+    "ForecastError",
+    "VerificationError",
+    "ExportError",
+    "HPCError",
 ]
