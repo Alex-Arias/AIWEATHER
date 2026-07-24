@@ -43,7 +43,7 @@ class Forecast:
         """
         return tuple(self.dataset.data_vars)
 
-        @property
+    @property
     def shape(self):
         """
         Dataset dimensions.
