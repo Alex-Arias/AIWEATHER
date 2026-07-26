@@ -25,6 +25,7 @@ class BaseModel(ABC):
         self.name = name
         self.version = version
         self.device = device
+        self._loaded = False
 
     def __repr__(self) -> str:
         return (
@@ -33,6 +34,13 @@ class BaseModel(ABC):
             f"version={self.version!r}, "
             f"device={self.device!r})"
         )
+
+    @property
+    def loaded(self) -> bool:
+        """
+        Return whether model weights have been loaded.
+        """
+        return self._loaded
 
     @abstractmethod
     def load_weights(
