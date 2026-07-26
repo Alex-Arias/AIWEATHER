@@ -1,5 +1,5 @@
 """
-Base class for AIWeather preprocessing pipelines.
+Abstract base class for AIWeather preprocessors.
 """
 
 from __future__ import annotations
@@ -11,11 +11,43 @@ import xarray as xr
 
 class BasePreprocessor(ABC):
     """
-    Abstract preprocessing interface.
+    Abstract interface for preprocessing datasets before inference.
     """
 
     @abstractmethod
-    def preprocess(self, dataset: xr.Dataset) -> xr.Dataset:
+    def validate(
+        self,
+        dataset: xr.Dataset,
+    ) -> xr.Dataset:
         """
-        Convert an input dataset into the format required by a model.
+        Validate the input dataset.
+
+        Parameters
+        ----------
+        dataset
+            Input dataset.
+
+        Returns
+        -------
+        xr.Dataset
+            Validated dataset.
+        """
+
+    @abstractmethod
+    def preprocess(
+        self,
+        dataset: xr.Dataset,
+    ) -> xr.Dataset:
+        """
+        Run the preprocessing pipeline.
+
+        Parameters
+        ----------
+        dataset
+            Input dataset.
+
+        Returns
+        -------
+        xr.Dataset
+            Preprocessed dataset.
         """
