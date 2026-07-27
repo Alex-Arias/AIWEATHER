@@ -8,6 +8,7 @@ import xarray as xr
 
 from .base import BasePreprocessor
 
+from aiweather.exceptions import ValidationError
 
 class GraphCastPreprocessor(BasePreprocessor):
     """
@@ -33,7 +34,7 @@ class GraphCastPreprocessor(BasePreprocessor):
         ]
 
         if missing:
-            raise ValueError(
+            raise ValidationError(
                 f"Missing required variables: {missing}"
             )
 
