@@ -81,7 +81,16 @@ class GraphCastModel(BaseModel):
         print("CoordSystem keys:")
         print(coords.keys())
 
-        return tensor, coords
+        
+        iterator = self._model.create_iterator(
+            tensor,
+            coords,
+        )
+
+        print()
+        print("Iterator created successfully!")
+
+        return iterator    
 
 
     def unload(self) -> None:
