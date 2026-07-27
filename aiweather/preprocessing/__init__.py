@@ -10,3 +10,5 @@ __all__ = [
     "BasePreprocessor",
     "GraphCastPreprocessor",
 ]
+
+from .tensors import dataset_to_tensor
