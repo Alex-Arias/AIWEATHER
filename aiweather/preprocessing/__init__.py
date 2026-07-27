@@ -12,3 +12,4 @@ __all__ = [
 ]
 
 from .tensors import dataset_to_tensor
+from .coordsystem import dataset_to_coordsystem
