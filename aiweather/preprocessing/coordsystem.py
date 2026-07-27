@@ -17,7 +17,7 @@ def dataset_to_coordsystem(dataset: xr.Dataset) -> OrderedDict:
 
     coords = OrderedDict()
 
-    coords["batch"] = np.array([])
+    coords["batch"] = np.array([0])
 
     coords["time"] = dataset.time.values
 
