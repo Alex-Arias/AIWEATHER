@@ -2,8 +2,13 @@
 GraphCast model adapter.
 """
 
-
 from __future__ import annotations
+
+from aiweather.preprocessing import (
+    GraphCastPreprocessor,
+    dataset_to_tensor,
+    dataset_to_coordsystem,
+)
 
 from earth2studio.models.px import GraphCastOperational
 
@@ -49,10 +54,35 @@ class GraphCastModel(BaseModel):
         self,
         dataset,
         lead_time: int,
-    ) -> Forecast:
-        raise NotImplementedError(
-            "GraphCast inference not implemented yet."
-        )
+    ):
+        """
+        Execute the GraphCast preprocessing pipeline.
+
+        Forecast generation will be implemented
+        in the next milestone.
+        """
+
+        if not self.loaded:
+            self.load_weights()
+
+        preprocessor = GraphCastPreprocessor()
+
+        dataset = preprocessor.preprocess(dataset)
+
+        tensor = dataset_to_tensor(dataset)
+
+        coords = dataset_to_coordsystem(dataset)
+
+        print("Tensor shape:")
+        print(tensor.shape)
+
+        print()
+
+        print("CoordSystem keys:")
+        print(coords.keys())
+
+        return tensor, coords
+
 
     def unload(self) -> None:
         self._model = None
