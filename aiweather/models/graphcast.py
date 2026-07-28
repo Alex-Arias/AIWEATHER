@@ -4,15 +4,9 @@ GraphCast model adapter.
 
 from __future__ import annotations
 
-from aiweather.preprocessing import (
-    GraphCastPreprocessor,
-    dataset_to_tensor,
-    dataset_to_coordsystem,
-)
+from aiweather.adapters import GraphCastAdapter
 
 from earth2studio.models.px import GraphCastOperational
-
-from aiweather.forecast import Forecast
 
 from .base_model import BaseModel
 
@@ -31,6 +25,8 @@ class GraphCastModel(BaseModel):
 
         self._model = None
 
+        self.adapter = None
+
     def load_weights(
         self,
         path=None,
@@ -40,6 +36,9 @@ class GraphCastModel(BaseModel):
         """
 
         self._model = GraphCastOperational.from_pretrained()
+
+        self.adapter = GraphCastAdapter(self._model)
+
         self._loaded = True
 
     def supported_variables(self) -> tuple[str, ...]:
@@ -56,22 +55,16 @@ class GraphCastModel(BaseModel):
         lead_time: int,
     ):
         """
-        Execute the GraphCast preprocessing pipeline.
-
-        Forecast generation will be implemented
-        in the next milestone.
+        Execute a GraphCast forecast.
         """
 
         if not self.loaded:
             self.load_weights()
 
-        preprocessor = GraphCastPreprocessor()
-
-        dataset = preprocessor.preprocess(dataset)
-
-        tensor = dataset_to_tensor(dataset)
-
-        coords = dataset_to_coordsystem(dataset)
+        #
+        # Delegate all preprocessing to the adapter
+        #
+        tensor, coords = self.adapter.prepare(dataset)
 
         print("Tensor shape:")
         print(tensor.shape)
@@ -81,7 +74,6 @@ class GraphCastModel(BaseModel):
         print("CoordSystem keys:")
         print(coords.keys())
 
-        
         iterator = self._model.create_iterator(
             tensor,
             coords,
@@ -90,8 +82,7 @@ class GraphCastModel(BaseModel):
         print()
         print("Iterator created successfully!")
 
-        return iterator    
-
+        return iterator
 
     def unload(self) -> None:
         self._model = None
