@@ -61,28 +61,11 @@ class GraphCastModel(BaseModel):
         if not self.loaded:
             self.load_weights()
 
-        #
-        # Delegate all preprocessing to the adapter
-        #
-        tensor, coords = self.adapter.prepare(dataset)
-
-        print("Tensor shape:")
-        print(tensor.shape)
-
-        print()
-
-        print("CoordSystem keys:")
-        print(coords.keys())
-
-        iterator = self._model.create_iterator(
-            tensor,
-            coords,
+        return self.adapter.run(
+            dataset,
+            lead_time,
         )
 
-        print()
-        print("Iterator created successfully!")
-
-        return iterator
 
     def unload(self) -> None:
         self._model = None
