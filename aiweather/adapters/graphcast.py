@@ -4,6 +4,8 @@ GraphCast adapter.
 
 from __future__ import annotations
 
+from aiweather.postprocessing import tensor_to_dataset
+
 from aiweather.preprocessing import (
     GraphCastPreprocessor,
     dataset_to_tensor,
@@ -55,4 +57,33 @@ class GraphCastAdapter(BaseAdapter):
             coords,
         )
 
-        return iterator
+        print()
+        print("Generator created")
+        print()
+
+        print("Getting first forecast...")
+        print()
+
+        forecast_tensor, forecast_coords = next(iterator)
+
+        print("Forecast tensor:")
+        print(type(forecast_tensor))
+
+        if hasattr(forecast_tensor, "shape"):
+            print(forecast_tensor.shape)
+
+        print()
+
+        print("Forecast coords:")
+        print(type(forecast_coords))
+        print(forecast_coords)
+
+        return forecast_tensor, forecast_coords
+
+
+#        iterator = self.model.create_iterator(
+#            tensor,
+#            coords,
+#        )
+#
+#        return iterator
