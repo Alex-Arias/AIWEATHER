@@ -8,15 +8,51 @@ from earth2studio.models.px import GraphCastOperational
 
 from .base_runner import BaseRunner
 
+from earth2studio.data import GFS
+
+import torch
+
+
+
 
 class GraphCastRunner(BaseRunner):
-    """
-    Execute GraphCast forecasts using Earth2Studio.
-    """
 
     def __init__(self):
 
         self.model = None
+
+    # ---------------------------------------------------------
+    # Device
+    # ---------------------------------------------------------
+
+    def check_device(
+        self,
+        request,
+    ):
+
+        print()
+
+        print("Checking execution device...")
+        
+        if request.device == "cuda":
+
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA device not available.")
+
+            print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+
+        elif request.device == "cpu":
+
+            print("Using CPU.")
+
+        else:
+
+            raise ValueError(f"Unknown device: {request.device}")
+
+
+
+
+
 
     # ---------------------------------------------------------
     # Model
@@ -34,14 +70,22 @@ class GraphCastRunner(BaseRunner):
 
         print("GraphCast loaded.")
 
+    
     # ---------------------------------------------------------
-    # Data
+    # Data  
     # ---------------------------------------------------------
 
-    def load_data(self):
+    def load_data(
+        self,
+    ):
 
-        raise NotImplementedError
+        print()
 
+        print("Initializing GFS...")
+
+       return GFS()
+    
+    
     # ---------------------------------------------------------
     # Forecast
     # ---------------------------------------------------------
@@ -51,8 +95,13 @@ class GraphCastRunner(BaseRunner):
         request,
     ):
 
-        if self.model is None:
+        self.check_device(request)
 
+        if self.model is None:
             self.load_model()
+
+        data = self.load_data()
+
+        print("Data source initialized.")
 
         raise NotImplementedError
