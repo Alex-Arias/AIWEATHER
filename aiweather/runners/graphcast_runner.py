@@ -5,54 +5,13 @@ GraphCast operational runner.
 from __future__ import annotations
 
 from earth2studio.models.px import GraphCastOperational
+from earth2studio.run import deterministic
+from earth2studio.data import GFS
 
 from .base_runner import BaseRunner
 
-from earth2studio.data import GFS
-
-import torch
-
-
-
 
 class GraphCastRunner(BaseRunner):
-
-    def __init__(self):
-
-        self.model = None
-
-    # ---------------------------------------------------------
-    # Device
-    # ---------------------------------------------------------
-
-    def check_device(
-        self,
-        request,
-    ):
-
-        print()
-
-        print("Checking execution device...")
-        
-        if request.device == "cuda":
-
-            if not torch.cuda.is_available():
-                raise RuntimeError("CUDA device not available.")
-
-            print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-
-        elif request.device == "cpu":
-
-            print("Using CPU.")
-
-        else:
-
-            raise ValueError(f"Unknown device: {request.device}")
-
-
-
-
-
 
     # ---------------------------------------------------------
     # Model
@@ -60,8 +19,10 @@ class GraphCastRunner(BaseRunner):
 
     def load_model(self):
 
-        print()
+        if self.model is not None:
+            return
 
+        print()
         print("Loading GraphCastOperational...")
 
         package = GraphCastOperational.load_default_package()
@@ -70,38 +31,38 @@ class GraphCastRunner(BaseRunner):
 
         print("GraphCast loaded.")
 
-    
     # ---------------------------------------------------------
-    # Data  
+    # Data
     # ---------------------------------------------------------
 
-    def load_data(
-        self,
-    ):
+    def load_data(self):
+
+        if self.data is not None:
+            return
 
         print()
-
         print("Initializing GFS...")
 
-       return GFS()
-    
-    
+        self.data = GFS()
+
+        print("GFS initialized.")
+
     # ---------------------------------------------------------
     # Forecast
     # ---------------------------------------------------------
 
-    def run(
-        self,
-        request,
-    ):
+    def run_forecast(self, request):
 
-        self.check_device(request)
+        print()
+        print("Running deterministic forecast...")
 
-        if self.model is None:
-            self.load_model()
+        deterministic(
+            time=[request.init_time],
+            nsteps=request.lead_time // 6,
+            prognostic=self.model,
+            data=self.data,
+            io=self.io,
+        )
 
-        data = self.load_data()
-
-        print("Data source initialized.")
-
-        raise NotImplementedError
+        print()
+        print("Forecast completed.")
