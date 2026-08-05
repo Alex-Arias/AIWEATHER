@@ -1,9 +1,8 @@
 #!/bin/bash
 
-echo "Exporting Conda environment..."
-conda env export --no-builds > environment/environment.yml
+echo "Exporting AIWeather environment..."
 
-echo "Exporting pip requirements..."
-pip freeze > environment/requirements.txt
+conda env export --no-builds > environment.yml
+pip freeze > requirements.txt
 
 echo "Done."

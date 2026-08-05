@@ -1,18 +1,27 @@
 """
-Generic runner for Earth2Studio prognostic (px) models.
+Generic runner for Earth2Studio prognostic (PX) models.
 """
 
 from __future__ import annotations
 
-from earth2studio.run import deterministic
+from aiweather.backends.earth2studio import (
+    load_px_model,
+    load_data_source,
+)
 
-from aiweather.registry.models import MODEL_REGISTRY
-from aiweather.registry.datasources import DATA_REGISTRY
+from aiweather.backends.earth2studio.inference import (
+    run_forecast,
+)
 
 from .base_runner import BaseRunner
 
 
 class PXRunner(BaseRunner):
+    """
+    Generic runner for Earth2Studio prognostic models.
+
+    Concrete subclasses only need to define MODEL_NAME.
+    """
 
     MODEL_NAME = None
 
@@ -20,24 +29,27 @@ class PXRunner(BaseRunner):
         super().__init__()
 
     # ---------------------------------------------------------
-    # Model
+    # Validation
     # ---------------------------------------------------------
 
-    def load_model(self):
-
+    def _check_model_name(self):
         if self.MODEL_NAME is None:
             raise ValueError(
                 "MODEL_NAME must be defined by subclasses."
             )
 
+    # ---------------------------------------------------------
+    # Model
+    # ---------------------------------------------------------
+
+    def load_model(self):
+
+        self._check_model_name()
+
         print()
         print(f"Loading {self.MODEL_NAME}...")
 
-        ModelClass = MODEL_REGISTRY[self.MODEL_NAME]
-
-        package = ModelClass.load_default_package()
-
-        self.model = ModelClass.load_model(package)
+        self.model = load_px_model(self.MODEL_NAME)
 
         print(f"{self.MODEL_NAME} loaded.")
 
@@ -47,20 +59,14 @@ class PXRunner(BaseRunner):
 
     def load_data(self):
 
-        if self.MODEL_NAME is None:
-            raise ValueError(
-                "MODEL_NAME must be defined by subclasses."
-            )
+        self._check_model_name()
 
         print()
+        print(f"Initializing datasource for {self.MODEL_NAME}...")
 
-        DataClass = DATA_REGISTRY[self.MODEL_NAME]
+        self.data = load_data_source(self.MODEL_NAME)
 
-        print(f"Initializing {DataClass.__name__}...")
-
-        self.data = DataClass()
-
-        print(f"{DataClass.__name__} initialized.")
+        print("Datasource initialized.")
 
     # ---------------------------------------------------------
     # Forecast
@@ -71,7 +77,7 @@ class PXRunner(BaseRunner):
         print()
         print("Running deterministic forecast...")
 
-        deterministic(
+        run_forecast(
             time=[request.init_time],
             nsteps=request.lead_time // 6,
             prognostic=self.model,
