@@ -2,5 +2,15 @@
 AIWeather registry.
 """
 
-from .models import MODEL_REGISTRY
-from .datasources import DATA_REGISTRY
+from .models import (
+    available_models,
+    get_px_model,
+)
+
+from .datasources import get_data_source
+
+__all__ = [
+    "available_models",
+    "get_px_model",
+    "get_data_source",
+]

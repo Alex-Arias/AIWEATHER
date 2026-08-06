@@ -9,7 +9,7 @@ from aiweather.registry.datasources import get_data_source
 
 def load_data_source(model_name: str):
     """
-    Instantiate the datasource associated with a PX model.
+    Instantiate the datasource required by a model.
     """
 
     DataClass = get_data_source(model_name)

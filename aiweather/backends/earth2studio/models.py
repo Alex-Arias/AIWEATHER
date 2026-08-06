@@ -9,7 +9,7 @@ from aiweather.registry.models import get_px_model
 
 def load_px_model(model_name: str):
     """
-    Load a PX model from the AIWeather registry.
+    Load any Earth2Studio prognostic model.
     """
 
     ModelClass = get_px_model(model_name)
