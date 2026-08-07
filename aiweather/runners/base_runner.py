@@ -4,11 +4,9 @@ Base runner class for all AIWeather models.
 
 from __future__ import annotations
 
-import os
 import time
 
 import torch
-from earth2studio.io import ZarrBackend
 
 
 class BaseRunner:
@@ -51,15 +49,9 @@ class BaseRunner:
 
     def build_output(self, request):
 
-        output_dir = request.output_path
+        output_dir = request.output_path or "outputs"
 
-        if output_dir is None:
-            output_dir = "outputs"
-
-        os.makedirs(
-            output_dir,
-            exist_ok=True,
-        )
+        os.makedirs(output_dir, exist_ok=True)
 
         filename = (
             f"{request.model}_"
@@ -68,18 +60,13 @@ class BaseRunner:
             f"{request.lead_time}h.zarr"
         )
 
-        output_file = os.path.join(
-            output_dir,
-            filename,
-        )
+        output_file = os.path.join(output_dir, filename)
 
         self.io = ZarrBackend(output_file)
 
-        print()
-        print(f"Output: {output_file}")
-
         return output_file
 
+    
     # ---------------------------------------------------------
     # Cleanup
     # ---------------------------------------------------------
@@ -104,7 +91,7 @@ class BaseRunner:
         if self.data is None:
             self.load_data()
 
-        output = self.build_output(request)
+        self.build_output(request)
 
         self.run_forecast(request)
 
@@ -112,7 +99,9 @@ class BaseRunner:
 
         elapsed = time.time() - t0
 
-        print()
-        print(f"Finished in {elapsed:.1f} seconds")
+        #print()
+        #print(f"Finished in {elapsed:.1f} seconds")
 
-        return output
+        return None
+
+   

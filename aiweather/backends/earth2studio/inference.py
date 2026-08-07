@@ -4,6 +4,8 @@ Earth2Studio inference backend.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from earth2studio.run import deterministic
 
 
@@ -17,11 +19,13 @@ def run_forecast(
 ):
     """
     Execute a deterministic Earth2Studio forecast.
-
-    This wrapper isolates AIWeather from direct Earth2Studio API calls.
-    Future versions may support ensemble and stochastic inference
-    without changing the runner interface.
     """
+
+    if isinstance(time, str):
+        time = [datetime.fromisoformat(time)]
+
+    elif isinstance(time, datetime):
+        time = [time]
 
     return deterministic(
         time=time,
