@@ -29,6 +29,10 @@ class Configuration:
 
     values: dict[str, Any] = field(default_factory=dict)
 
+    # ---------------------------------------------------------
+    # Constructors
+    # ---------------------------------------------------------
+
     @classmethod
     def from_yaml(
         cls,
@@ -42,18 +46,19 @@ class Configuration:
         common = cls._load_yaml(common_file)
         model = cls._load_yaml(model_file)
 
-        merged = {**common, **model}
+        merged = cls._deep_merge(common, model)
 
         config = cls(values=merged)
         config.validate()
 
         return config
 
+    # ---------------------------------------------------------
+    # Internal utilities
+    # ---------------------------------------------------------
+
     @staticmethod
     def _load_yaml(path: str | Path) -> dict[str, Any]:
-        """
-        Load a YAML configuration file.
-        """
 
         path = Path(path)
 
@@ -75,18 +80,50 @@ class Configuration:
 
         return data
 
+    @staticmethod
+    def _deep_merge(
+        base: dict[str, Any],
+        override: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Recursively merge two dictionaries.
+        """
+
+        merged = dict(base)
+
+        for key, value in override.items():
+
+            if (
+                key in merged
+                and isinstance(merged[key], dict)
+                and isinstance(value, dict)
+            ):
+                merged[key] = Configuration._deep_merge(
+                    merged[key],
+                    value,
+                )
+            else:
+                merged[key] = value
+
+        return merged
+
+    # ---------------------------------------------------------
+    # Validation
+    # ---------------------------------------------------------
+
     def validate(self) -> None:
         """
-        Validate required configuration fields.
+        Validate common configuration fields.
         """
 
         required = (
-            "model_name",
-            "dataset",
+            "paths",
+            "hardware",
         )
 
         missing = [
-            key for key in required
+            key
+            for key in required
             if key not in self.values
         ]
 
@@ -96,27 +133,62 @@ class Configuration:
                 + ", ".join(missing)
             )
 
+    # ---------------------------------------------------------
+    # Generic access
+    # ---------------------------------------------------------
+
     def get(
         self,
         key: str,
         default: Any = None,
     ) -> Any:
-        """
-        Return a configuration value.
-        """
 
         return self.values.get(key, default)
 
     def to_dict(self) -> dict[str, Any]:
-        """
-        Return a copy of the configuration dictionary.
-        """
 
         return dict(self.values)
 
+    # ---------------------------------------------------------
+    # Convenience properties
+    # ---------------------------------------------------------
+
+    @property
+    def model_root(self) -> Path:
+        return Path(self.values["paths"]["model_root"])
+
+    @property
+    def cache_root(self) -> Path:
+        return Path(self.values["paths"]["cache_root"])
+
+    @property
+    def checkpoint_root(self) -> Path:
+        return Path(self.values["paths"]["checkpoint_root"])
+
+    @property
+    def output_root(self) -> Path:
+        return Path(self.values["paths"]["output_root"])
+
+    @property
+    def device(self) -> str:
+        return self.values["hardware"]["device"]
+
+    @property
+    def precision(self) -> str:
+        return self.values["hardware"]["precision"]
+
+    # ---------------------------------------------------------
+    # Representation
+    # ---------------------------------------------------------
+
     def __repr__(self) -> str:
+
+        model = self.values.get("model_name", "undefined")
+
+        dataset = self.values.get("dataset", "undefined")
+
         return (
             f"Configuration("
-            f"model={self.get('model_name')}, "
-            f"dataset={self.get('dataset')})"
+            f"model={model}, "
+            f"dataset={dataset})"
         )

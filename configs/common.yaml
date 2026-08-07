@@ -1,0 +1,25 @@
+# -------------------------------------------------------
+# Global AIWeather configuration
+# -------------------------------------------------------
+
+paths:
+
+  model_root: /LUSTRE/ariasv/AIWeather_models
+
+  cache_root: /LUSTRE/ariasv/AIWeather_models/cache
+
+  checkpoint_root: /LUSTRE/ariasv/AIWeather_models/checkpoints
+
+  output_root: /LUSTRE/ariasv/AIWeather/outputs
+
+
+hardware:
+
+  device: cuda
+
+  precision: fp16
+
+
+logging:
+
+  level: INFO
