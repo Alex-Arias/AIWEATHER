@@ -1,10 +1,13 @@
 """
-Forecast object for AIWeather.
+Forecast object and forecast loading utilities for AIWeather.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+import re
 
 import xarray as xr
 
@@ -39,17 +42,13 @@ class Forecast:
         )
 
     def __len__(self) -> int:
-        """
-        Number of forecast initialization times.
-        """
+        """Number of forecast initialization times."""
         if "time" in self.dataset.dims:
             return self.dataset.sizes["time"]
         return 0
 
     def to_xarray(self) -> xr.Dataset:
-        """
-        Return the underlying xarray Dataset.
-        """
+        """Return the underlying xarray Dataset."""
         return self.dataset
 
     # ---------------------------------------------------------
@@ -58,37 +57,27 @@ class Forecast:
 
     @property
     def variables(self) -> tuple[str, ...]:
-        """
-        Forecast variables.
-        """
+        """Forecast variables."""
         return tuple(self.dataset.data_vars)
 
     @property
     def coords(self):
-        """
-        Dataset coordinates.
-        """
+        """Dataset coordinates."""
         return self.dataset.coords
 
     @property
     def dimensions(self):
-        """
-        Dataset dimensions.
-        """
+        """Dataset dimensions."""
         return self.dataset.dims
 
     @property
     def shape(self):
-        """
-        Dataset sizes.
-        """
+        """Dataset sizes."""
         return self.dataset.sizes
 
     @property
     def latitude(self):
-        """
-        Latitude coordinate.
-        """
+        """Latitude coordinate."""
         if "lat" in self.dataset.coords:
             return self.dataset["lat"]
         if "latitude" in self.dataset.coords:
@@ -97,9 +86,7 @@ class Forecast:
 
     @property
     def longitude(self):
-        """
-        Longitude coordinate.
-        """
+        """Longitude coordinate."""
         if "lon" in self.dataset.coords:
             return self.dataset["lon"]
         if "longitude" in self.dataset.coords:
@@ -108,18 +95,99 @@ class Forecast:
 
     @property
     def lead_time(self):
-        """
-        Lead-time coordinate.
-        """
+        """Lead-time coordinate."""
         if "lead_time" in self.dataset.coords:
             return self.dataset["lead_time"]
         return None
 
     @property
     def initialization_time(self):
-        """
-        Forecast initialization time.
-        """
+        """Forecast initialization time."""
         if "time" in self.dataset.coords:
             return self.dataset["time"]
         return None
+
+
+def _metadata_from_path(path: str | Path, dataset: xr.Dataset) -> ForecastMetadata:
+    """
+    Build ForecastMetadata from the standardized AIWeather output path.
+    """
+
+    path = Path(path)
+    name = path.name
+
+    pattern = re.compile(
+        r"^(?P<model>[^_]+)_(?P<datasource>[^_]+)_"
+        r"(?P<init>\d{8}T\d{6})_(?P<hours>\d+)h\.zarr$"
+    )
+
+    match = pattern.match(name)
+
+    if match is None:
+        raise ValueError(
+            "Forecast path does not match the expected AIWeather "
+            "output format: "
+            "<model>_<datasource>_<YYYYMMDDTHHMMSS>_<hours>h.zarr"
+        )
+
+    model = match.group("model")
+    datasource = match.group("datasource")
+    init_string = match.group("init")
+
+    initialization_time = datetime.strptime(
+        init_string,
+        "%Y%m%dT%H%M%S",
+    )
+
+    forecast_id = path.stem
+
+    return ForecastMetadata(
+        model_name=model,
+        model_version="unknown",
+        backend="earth2studio",
+        forecast_id=forecast_id,
+        initialization_time=initialization_time,
+        creation_time=None,
+    )
+
+
+def open_forecast(
+    path: str | Path,
+    *,
+    consolidated: bool = True,
+) -> Forecast:
+    """
+    Open an AIWeather forecast stored in Zarr format.
+
+    Parameters
+    ----------
+    path : str or pathlib.Path
+        Path to the forecast Zarr store.
+
+    consolidated : bool, default=True
+        Whether to read consolidated Zarr metadata.
+
+    Returns
+    -------
+    Forecast
+        AIWeather Forecast object containing a lazy xarray Dataset.
+    """
+
+    path = Path(path)
+
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Forecast Zarr store not found: {path}"
+        )
+
+    dataset = xr.open_zarr(
+        path,
+        consolidated=consolidated,
+    )
+
+    metadata = _metadata_from_path(path, dataset)
+
+    return Forecast(
+        dataset=dataset,
+        metadata=metadata,
+    )
