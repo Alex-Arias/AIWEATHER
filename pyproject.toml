@@ -1,0 +1,13 @@
+[tool.pytest.ini_options]
+pythonpath = [
+    ".",
+]
+
+markers = [
+    "gpu: tests that require a CUDA GPU",
+    "integration: tests that require external models, data, or system resources",
+]
+
+testpaths = [
+    "tests",
+]
