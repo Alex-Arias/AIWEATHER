@@ -463,3 +463,328 @@ def test_graphcast_regional_pressure_minimum():
 
     assert 5.0 <= minimum.latitude <= 35.0
     assert 230.0 <= minimum.longitude <= 270.0
+
+# ---------------------------------------------------------
+# Multiple pressure minima
+# ---------------------------------------------------------
+
+
+def test_detect_pressure_minima_known_field():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        [
+            [101000.0, 101000.0, 101000.0, 101000.0, 101000.0],
+            [101000.0, 98000.0, 101000.0, 99000.0, 101000.0],
+            [101000.0, 101000.0, 101000.0, 101000.0, 101000.0],
+            [101000.0, 99500.0, 101000.0, 97000.0, 101000.0],
+            [101000.0, 101000.0, 101000.0, 101000.0, 101000.0],
+        ],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [
+                10.0,
+                11.0,
+                12.0,
+                13.0,
+                14.0,
+            ],
+            "lon": [
+                250.0,
+                251.0,
+                252.0,
+                253.0,
+                254.0,
+            ],
+        },
+        attrs={
+            "units": "Pa",
+        },
+    )
+
+    minima = detect_pressure_minima(
+        pressure,
+        max_candidates=4,
+        minimum_separation_km=0.0,
+    )
+
+    assert len(minima) == 4
+
+    assert minima[0].value == pytest.approx(
+        97000.0
+    )
+
+    assert minima[0].latitude == pytest.approx(
+        13.0
+    )
+
+    assert minima[0].longitude == pytest.approx(
+        253.0
+    )
+
+    assert minima[1].value == pytest.approx(
+        98000.0
+    )
+
+    assert minima[2].value == pytest.approx(
+        99000.0
+    )
+
+    assert minima[3].value == pytest.approx(
+        99500.0
+    )
+
+
+def test_detect_pressure_minima_sorted_by_pressure():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        [
+            [100000.0, 99000.0, 100000.0],
+            [98000.0, 100500.0, 97000.0],
+            [100000.0, 99500.0, 100000.0],
+        ],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [10.0, 11.0, 12.0],
+            "lon": [250.0, 251.0, 252.0],
+        },
+    )
+
+    minima = detect_pressure_minima(
+        pressure,
+        max_candidates=10,
+        minimum_separation_km=0.0,
+    )
+
+    values = [
+        minimum.value
+        for minimum in minima
+    ]
+
+    assert values == sorted(values)
+
+
+def test_detect_pressure_minima_respects_max_candidates():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        [
+            [100000.0, 99000.0, 100000.0],
+            [98000.0, 100500.0, 97000.0],
+            [100000.0, 99500.0, 100000.0],
+        ],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [10.0, 11.0, 12.0],
+            "lon": [250.0, 251.0, 252.0],
+        },
+    )
+
+    minima = detect_pressure_minima(
+        pressure,
+        max_candidates=2,
+        minimum_separation_km=0.0,
+    )
+
+    assert len(minima) == 2
+
+
+def test_detect_pressure_minima_applies_separation():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        [
+            [101000.0, 101000.0, 101000.0],
+            [101000.0, 97000.0, 98000.0],
+            [101000.0, 101000.0, 101000.0],
+        ],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [10.0, 11.0, 12.0],
+            "lon": [250.0, 251.0, 252.0],
+        },
+    )
+
+    minima = detect_pressure_minima(
+        pressure,
+        max_candidates=10,
+        minimum_separation_km=200.0,
+    )
+
+    # Nearby competing minima should not both survive the
+    # geographic separation filter.
+    assert len(minima) >= 1
+
+    assert minima[0].value == pytest.approx(
+        97000.0
+    )
+
+
+def test_detect_pressure_minima_preserves_units():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        [
+            [101000.0, 99000.0],
+            [100000.0, 101000.0],
+        ],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [10.0, 11.0],
+            "lon": [250.0, 251.0],
+        },
+        attrs={
+            "units": "Pa",
+        },
+    )
+
+    minima = detect_pressure_minima(
+        pressure,
+        max_candidates=1,
+    )
+
+    assert minima[0].units == "Pa"
+
+
+def test_detect_pressure_minima_accepts_singleton_dimensions():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        [[[[101000.0, 99000.0]]]],
+        dims=(
+            "time",
+            "lead_time",
+            "lat",
+            "lon",
+        ),
+        coords={
+            "time": [
+                np.datetime64(
+                    "2026-07-24"
+                )
+            ],
+            "lead_time": [
+                np.timedelta64(
+                    0,
+                    "h",
+                )
+            ],
+            "lat": [10.0],
+            "lon": [250.0, 251.0],
+        },
+    )
+
+    minima = detect_pressure_minima(
+        pressure,
+        max_candidates=1,
+    )
+
+    assert len(minima) == 1
+    assert minima[0].value == pytest.approx(
+        99000.0
+    )
+
+
+def test_detect_pressure_minima_rejects_multiple_times():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        np.ones((2, 2, 2)),
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [
+                np.timedelta64(0, "h"),
+                np.timedelta64(6, "h"),
+            ],
+            "lat": [10.0, 11.0],
+            "lon": [250.0, 251.0],
+        },
+    )
+
+    with pytest.raises(ValueError):
+        detect_pressure_minima(
+            pressure
+        )
+
+
+def test_detect_pressure_minima_rejects_invalid_candidate_count():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        [[100000.0]],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    with pytest.raises(ValueError):
+        detect_pressure_minima(
+            pressure,
+            max_candidates=0,
+        )
+
+
+def test_detect_pressure_minima_rejects_invalid_separation():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    pressure = xr.DataArray(
+        [[100000.0]],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    with pytest.raises(ValueError):
+        detect_pressure_minima(
+            pressure,
+            minimum_separation_km=-1.0,
+        )
+
+
+def test_graphcast_multiple_pressure_minima():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    forecast = open_forecast(
+        FORECAST_PATH
+    )
+
+    region = forecast.select_region(
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+    )
+
+    pressure = region["msl"].isel(
+        time=0,
+        lead_time=6,
+    )
+
+    minima = detect_pressure_minima(
+        pressure,
+        max_candidates=10,
+        minimum_separation_km=500.0,
+    )
+
+    assert len(minima) > 0
+    assert len(minima) <= 10
+
+    # The lowest detected local minimum should equal the
+    # unconstrained regional minimum at this lead time.
+    assert minima[0].value == pytest.approx(
+        100444.72,
+        abs=0.1,
+    )
+
+    assert minima[0].latitude == pytest.approx(
+        11.50
+    )
+
+    assert minima[0].longitude == pytest.approx(
+        257.25
+    )
