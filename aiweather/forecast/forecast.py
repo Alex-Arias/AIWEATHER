@@ -115,6 +115,94 @@ class Forecast:
         return None
 
     # ---------------------------------------------------------
+    # Coordinate utilities
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def _normalize_longitude(longitude: float) -> float:
+        """
+        Normalize longitude to the [0, 360) convention.
+
+        Parameters
+        ----------
+        longitude : float
+            Longitude in degrees. Values in either the conventional
+            [-180, 180) range or [0, 360) are accepted.
+
+        Returns
+        -------
+        float
+            Longitude normalized to [0, 360).
+        """
+        return longitude % 360.0
+
+    # ---------------------------------------------------------
+    # Spatial selection
+    # ---------------------------------------------------------
+
+    def select_point(
+        self,
+        latitude: float,
+        longitude: float,
+    ) -> xr.Dataset:
+        """
+        Select the nearest grid point to a latitude/longitude.
+
+        Longitude is automatically normalized to the dataset
+        convention [0, 360).
+
+        Parameters
+        ----------
+        latitude : float
+            Requested latitude in degrees.
+
+        longitude : float
+            Requested longitude in degrees. Values in either
+            [-180, 180) or [0, 360) are accepted.
+
+        Returns
+        -------
+        xr.Dataset
+            Dataset containing the nearest grid point.
+
+        Raises
+        ------
+        ValueError
+            If latitude or longitude is outside the supported range,
+            or if the dataset does not contain the required coordinates.
+        """
+
+        if not -90.0 <= latitude <= 90.0:
+            raise ValueError(
+                "Latitude must be between -90 and 90 degrees. "
+                f"Received: {latitude}"
+            )
+
+        if not -360.0 <= longitude <= 360.0:
+            raise ValueError(
+                "Longitude must be between -360 and 360 degrees. "
+                f"Received: {longitude}"
+            )
+
+        if self.latitude is None:
+            raise ValueError(
+                "Forecast dataset does not contain a latitude coordinate."
+            )
+
+        if self.longitude is None:
+            raise ValueError(
+                "Forecast dataset does not contain a longitude coordinate."
+            )
+
+        normalized_longitude = self._normalize_longitude(longitude)
+
+        return self.dataset.sel(
+            lat=latitude,
+            lon=normalized_longitude,
+            method="nearest",
+        )
+
+    # ---------------------------------------------------------
     # Variable access
     # ---------------------------------------------------------
 
@@ -167,7 +255,7 @@ class Forecast:
             )
 
         # The Zarr dataset stores lead_time as timedelta64[h].
-        # Convert it explicitly to integer hours before comparison.
+        # Convert explicitly to integer hours before comparison.
         lead_hours = (
             variable["lead_time"]
             .values
@@ -185,7 +273,7 @@ class Forecast:
                 f"Available lead times: {available}"
             )
 
-        # Keep lead time as a singleton dimension
+        # Keep lead_time as a singleton dimension.
         return variable.isel(
             lead_time=[int(matches[0])]
         )
@@ -331,10 +419,7 @@ def open_forecast(
         consolidated=consolidated,
     )
 
-    metadata = _metadata_from_path(
-        path,
-        dataset,
-    )
+    metadata = _metadata_from_path(path, dataset)
 
     return Forecast(
         dataset=dataset,

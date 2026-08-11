@@ -1,15 +1,23 @@
 from datetime import datetime
 
 import numpy as np
-
 import pytest
 
-from aiweather.forecast import Forecast, ForecastMetadata, open_forecast
+from aiweather.forecast import (
+    Forecast,
+    ForecastMetadata,
+    open_forecast,
+)
 
 
 FORECAST_PATH = (
     "outputs/graphcast_gfs_20260724T000000_240h.zarr"
 )
+
+
+# ---------------------------------------------------------
+# Forecast loading
+# ---------------------------------------------------------
 
 
 def test_open_forecast():
@@ -81,8 +89,10 @@ def test_forecast_to_xarray():
 def test_forecast_is_lazy():
     forecast = open_forecast(FORECAST_PATH)
 
-    # The forecast should remain lazily loaded.
-    assert hasattr(forecast.dataset["t2m"].data, "compute")
+    assert hasattr(
+        forecast.dataset["t2m"].data,
+        "compute",
+    )
 
 
 def test_missing_forecast():
@@ -97,9 +107,14 @@ def test_invalid_forecast_path(tmp_path):
     invalid_path.mkdir()
 
     with pytest.raises(ValueError):
-        # The store exists, but its name does not follow
-        # the AIWeather forecast naming convention.
         open_forecast(invalid_path)
+
+
+# ---------------------------------------------------------
+# Variable access
+# ---------------------------------------------------------
+
+
 def test_get_variable():
     forecast = open_forecast(FORECAST_PATH)
 
@@ -142,6 +157,11 @@ def test_get_variable_invalid_lead_time():
         )
 
 
+# ---------------------------------------------------------
+# Lead-time selection
+# ---------------------------------------------------------
+
+
 def test_select_lead_time():
     forecast = open_forecast(FORECAST_PATH)
 
@@ -181,3 +201,91 @@ def test_selection_remains_lazy():
         selected.dataset["t2m"].data,
         "compute",
     )
+
+
+# ---------------------------------------------------------
+# Spatial point selection
+# ---------------------------------------------------------
+
+
+def test_select_point_normalizes_negative_longitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    point = forecast.select_point(
+        latitude=31.86,
+        longitude=-116.67,
+    )
+
+    assert point.sizes["time"] == 1
+    assert point.sizes["lead_time"] == 41
+
+    assert point["lat"].item() == pytest.approx(31.75)
+    assert point["lon"].item() == pytest.approx(243.25)
+
+
+def test_select_point_accepts_0360_longitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    point = forecast.select_point(
+        latitude=31.86,
+        longitude=243.33,
+    )
+
+    assert point["lat"].item() == pytest.approx(31.75)
+    assert point["lon"].item() == pytest.approx(243.25)
+
+
+def test_select_point_negative_and_0360_are_equivalent():
+    forecast = open_forecast(FORECAST_PATH)
+
+    point_negative = forecast.select_point(
+        latitude=31.86,
+        longitude=-116.67,
+    )
+
+    point_360 = forecast.select_point(
+        latitude=31.86,
+        longitude=243.33,
+    )
+
+    assert point_negative["lat"].item() == pytest.approx(
+        point_360["lat"].item()
+    )
+
+    assert point_negative["lon"].item() == pytest.approx(
+        point_360["lon"].item()
+    )
+
+
+def test_select_point_preserves_lazy_loading():
+    forecast = open_forecast(FORECAST_PATH)
+
+    point = forecast.select_point(
+        latitude=31.86,
+        longitude=-116.67,
+    )
+
+    assert hasattr(
+        point["t2m"].data,
+        "compute",
+    )
+
+
+def test_select_point_invalid_latitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select_point(
+            latitude=95.0,
+            longitude=-116.67,
+        )
+
+
+def test_select_point_invalid_longitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select_point(
+            latitude=31.86,
+            longitude=400.0,
+        )
