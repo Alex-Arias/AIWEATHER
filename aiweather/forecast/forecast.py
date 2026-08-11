@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 import re
 
+import numpy as np
 import xarray as xr
 
 from .metadata import ForecastMetadata
@@ -80,8 +81,10 @@ class Forecast:
         """Latitude coordinate."""
         if "lat" in self.dataset.coords:
             return self.dataset["lat"]
+
         if "latitude" in self.dataset.coords:
             return self.dataset["latitude"]
+
         return None
 
     @property
@@ -89,8 +92,10 @@ class Forecast:
         """Longitude coordinate."""
         if "lon" in self.dataset.coords:
             return self.dataset["lon"]
+
         if "longitude" in self.dataset.coords:
             return self.dataset["longitude"]
+
         return None
 
     @property
@@ -98,6 +103,7 @@ class Forecast:
         """Lead-time coordinate."""
         if "lead_time" in self.dataset.coords:
             return self.dataset["lead_time"]
+
         return None
 
     @property
@@ -105,10 +111,151 @@ class Forecast:
         """Forecast initialization time."""
         if "time" in self.dataset.coords:
             return self.dataset["time"]
+
         return None
 
+    # ---------------------------------------------------------
+    # Variable access
+    # ---------------------------------------------------------
 
-def _metadata_from_path(path: str | Path, dataset: xr.Dataset) -> ForecastMetadata:
+    def get_variable(
+        self,
+        name: str,
+        *,
+        lead_time: int | None = None,
+    ) -> xr.DataArray:
+        """
+        Return a forecast variable.
+
+        Parameters
+        ----------
+        name : str
+            Name of the forecast variable.
+
+        lead_time : int, optional
+            Forecast lead time in hours. If omitted, the complete
+            variable is returned.
+
+        Returns
+        -------
+        xr.DataArray
+            Requested forecast variable.
+
+        Raises
+        ------
+        KeyError
+            If the requested variable does not exist.
+
+        ValueError
+            If the requested lead time is not available.
+        """
+
+        if name not in self.dataset.data_vars:
+            raise KeyError(
+                f"Forecast variable {name!r} not found. "
+                f"Available variables: {list(self.dataset.data_vars)}"
+            )
+
+        variable = self.dataset[name]
+
+        if lead_time is None:
+            return variable
+
+        if "lead_time" not in variable.dims:
+            raise ValueError(
+                f"Variable {name!r} does not contain a lead_time dimension."
+            )
+
+        # The Zarr dataset stores lead_time as timedelta64[h].
+        # Convert it explicitly to integer hours before comparison.
+        lead_hours = (
+            variable["lead_time"]
+            .values
+            .astype("timedelta64[h]")
+            .astype(int)
+        )
+
+        matches = np.flatnonzero(lead_hours == lead_time)
+
+        if len(matches) == 0:
+            available = lead_hours.tolist()
+
+            raise ValueError(
+                f"Lead time {lead_time} h is not available. "
+                f"Available lead times: {available}"
+            )
+
+        # Keep lead time as a singleton dimension
+        return variable.isel(
+            lead_time=[int(matches[0])]
+        )
+
+
+    # ---------------------------------------------------------
+    # Lead-time selection
+    # ---------------------------------------------------------
+
+    def select_lead_time(self, lead_time: int) -> Forecast:
+        """
+        Return a new Forecast containing one selected lead time.
+
+        Parameters
+        ----------
+        lead_time : int
+            Forecast lead time in hours.
+
+        Returns
+        -------
+        Forecast
+            Forecast containing the selected lead time.
+
+        Raises
+        ------
+        ValueError
+            If the requested lead time is not available.
+        """
+
+        if "lead_time" not in self.dataset.coords:
+            raise ValueError(
+                "Forecast dataset does not contain a lead_time coordinate."
+            )
+
+        # Convert timedelta64[h] values to integer hours before
+        # comparing with the user-supplied integer lead time.
+        lead_hours = (
+            self.dataset["lead_time"]
+            .values
+            .astype("timedelta64[h]")
+            .astype(int)
+        )
+
+        matches = np.flatnonzero(lead_hours == lead_time)
+
+        if len(matches) == 0:
+            available = lead_hours.tolist()
+
+            raise ValueError(
+                f"Lead time {lead_time} h is not available. "
+                f"Available lead times: {available}"
+            )
+
+        dataset = self.dataset.isel(
+            lead_time=slice(
+                int(matches[0]),
+                int(matches[0]) + 1,
+            )
+        )
+
+        return Forecast(
+            dataset=dataset,
+            metadata=self.metadata,
+        )
+
+
+def _metadata_from_path(
+    path: str | Path,
+    dataset: xr.Dataset,
+) -> ForecastMetadata:
     """
     Build ForecastMetadata from the standardized AIWeather output path.
     """
@@ -131,7 +278,6 @@ def _metadata_from_path(path: str | Path, dataset: xr.Dataset) -> ForecastMetada
         )
 
     model = match.group("model")
-    datasource = match.group("datasource")
     init_string = match.group("init")
 
     initialization_time = datetime.strptime(
@@ -185,7 +331,10 @@ def open_forecast(
         consolidated=consolidated,
     )
 
-    metadata = _metadata_from_path(path, dataset)
+    metadata = _metadata_from_path(
+        path,
+        dataset,
+    )
 
     return Forecast(
         dataset=dataset,

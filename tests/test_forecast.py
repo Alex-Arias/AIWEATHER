@@ -100,3 +100,84 @@ def test_invalid_forecast_path(tmp_path):
         # The store exists, but its name does not follow
         # the AIWeather forecast naming convention.
         open_forecast(invalid_path)
+def test_get_variable():
+    forecast = open_forecast(FORECAST_PATH)
+
+    variable = forecast.get_variable("t2m")
+
+    assert variable.name == "t2m"
+    assert "lead_time" in variable.dims
+    assert hasattr(variable.data, "compute")
+
+
+def test_get_variable_at_lead_time():
+    forecast = open_forecast(FORECAST_PATH)
+
+    variable = forecast.get_variable(
+        "t2m",
+        lead_time=24,
+    )
+
+    assert variable.name == "t2m"
+    assert variable.sizes["lead_time"] == 1
+    assert variable.lead_time.values[0] == (
+        np.timedelta64(24, "h")
+    )
+
+
+def test_get_variable_missing():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(KeyError):
+        forecast.get_variable("not_a_real_variable")
+
+
+def test_get_variable_invalid_lead_time():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.get_variable(
+            "t2m",
+            lead_time=999,
+        )
+
+
+def test_select_lead_time():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_lead_time(24)
+
+    assert isinstance(selected, Forecast)
+    assert selected.shape["lead_time"] == 1
+    assert selected.lead_time.values[0] == (
+        np.timedelta64(24, "h")
+    )
+
+    # Original forecast remains unchanged.
+    assert forecast.shape["lead_time"] == 41
+
+
+def test_select_lead_time_invalid():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select_lead_time(999)
+
+
+def test_selection_preserves_metadata():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_lead_time(48)
+
+    assert selected.metadata == forecast.metadata
+
+
+def test_selection_remains_lazy():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_lead_time(24)
+
+    assert hasattr(
+        selected.dataset["t2m"].data,
+        "compute",
+    )
