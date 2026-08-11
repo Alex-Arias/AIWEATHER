@@ -87,3 +87,85 @@ def wind_speed(
         speed.attrs["units"] = u_units
 
     return speed
+
+def wind_direction(
+    u: xr.DataArray,
+    v: xr.DataArray,
+    *,
+    name: str = "wind_direction",
+) -> xr.DataArray:
+    """
+    Calculate meteorological wind direction.
+
+    Wind direction follows the meteorological convention and
+    represents the direction from which the wind is blowing:
+
+    - 0 degrees: north
+    - 90 degrees: east
+    - 180 degrees: south
+    - 270 degrees: west
+
+    Parameters
+    ----------
+    u : xr.DataArray
+        Zonal wind component, positive eastward.
+
+    v : xr.DataArray
+        Meridional wind component, positive northward.
+
+    name : str, default="wind_direction"
+        Name assigned to the resulting DataArray.
+
+    Returns
+    -------
+    xr.DataArray
+        Meteorological wind direction in degrees in the
+        interval [0, 360).
+
+    Raises
+    ------
+    TypeError
+        If u or v is not an xarray DataArray.
+
+    ValueError
+        If u and v do not have exactly matching coordinates
+        and dimensions.
+    """
+    if not isinstance(u, xr.DataArray):
+        raise TypeError(
+            f"u must be an xarray.DataArray, got {type(u).__name__}"
+        )
+
+    if not isinstance(v, xr.DataArray):
+        raise TypeError(
+            f"v must be an xarray.DataArray, got {type(v).__name__}"
+        )
+
+    try:
+        u_aligned, v_aligned = xr.align(
+            u,
+            v,
+            join="exact",
+        )
+    except ValueError as exc:
+        raise ValueError(
+            "u and v must have identical coordinates and dimensions."
+        ) from exc
+
+    direction = (
+        270.0
+        - np.degrees(
+            np.arctan2(
+                v_aligned,
+                u_aligned,
+            )
+        )
+    ) % 360.0
+
+    direction.name = name
+    direction.attrs = {
+        "long_name": "meteorological wind direction",
+        "units": "degrees",
+    }
+
+    return direction

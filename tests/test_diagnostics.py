@@ -199,3 +199,108 @@ def test_graphcast_point_wind_speed_value():
     assert float(value) == pytest.approx(
         float(expected)
     )
+
+# ---------------------------------------------------------
+# Wind direction
+# ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("u", "v", "expected"),
+    [
+        (0.0, -1.0, 0.0),    # from north
+        (-1.0, 0.0, 90.0),   # from east
+        (0.0, 1.0, 180.0),   # from south
+        (1.0, 0.0, 270.0),   # from west
+    ],
+)
+def test_wind_direction_cardinal_directions(
+    u,
+    v,
+    expected,
+):
+    from aiweather.diagnostics import wind_direction
+
+    u_da = xr.DataArray([u], dims=("point",))
+    v_da = xr.DataArray([v], dims=("point",))
+
+    direction = wind_direction(u_da, v_da)
+
+    assert direction.item() == pytest.approx(expected)
+
+
+def test_wind_direction_range():
+    from aiweather.diagnostics import wind_direction
+
+    u = xr.DataArray(
+        [1.0, -1.0, 1.0, -1.0],
+        dims=("point",),
+    )
+
+    v = xr.DataArray(
+        [1.0, 1.0, -1.0, -1.0],
+        dims=("point",),
+    )
+
+    direction = wind_direction(u, v)
+
+    assert bool((direction >= 0.0).all())
+    assert bool((direction < 360.0).all())
+
+
+def test_wind_direction_metadata():
+    from aiweather.diagnostics import wind_direction
+
+    u = xr.DataArray([3.0], dims=("point",))
+    v = xr.DataArray([4.0], dims=("point",))
+
+    direction = wind_direction(u, v)
+
+    assert direction.name == "wind_direction"
+    assert direction.attrs["units"] == "degrees"
+
+
+def test_wind_direction_rejects_mismatched_coordinates():
+    from aiweather.diagnostics import wind_direction
+
+    u = xr.DataArray(
+        [1.0, 2.0],
+        dims=("lat",),
+        coords={"lat": [20.0, 21.0]},
+    )
+
+    v = xr.DataArray(
+        [1.0, 2.0],
+        dims=("lat",),
+        coords={"lat": [20.0, 22.0]},
+    )
+
+    with pytest.raises(ValueError):
+        wind_direction(u, v)
+
+
+def test_graphcast_wind_direction_remains_lazy():
+    from aiweather.diagnostics import wind_direction
+
+    forecast = open_forecast(FORECAST_PATH)
+
+    direction = wind_direction(
+        forecast.dataset["u10m"],
+        forecast.dataset["v10m"],
+    )
+
+    assert direction.dims == (
+        "time",
+        "lead_time",
+        "lat",
+        "lon",
+    )
+
+    assert direction.shape == (
+        1,
+        41,
+        721,
+        1440,
+    )
+
+    assert hasattr(direction.data, "compute")
