@@ -23,6 +23,12 @@ from .tropical_cyclone import (
     track_pressure_minimum,
 )
 
+from .association import (
+    CandidatePoint,
+    CandidateTrack,
+    associate_candidates,
+)
+
 __all__ = [
     "TCClassification",
     "TrackMotion",
@@ -36,4 +42,7 @@ __all__ = [
     "records_to_xarray",
     "track_motion",
     "track_pressure_minimum",
+    "CandidatePoint",
+    "CandidateTrack",
+    "associate_candidates",
 ]
