@@ -1,0 +1,380 @@
+import numpy as np
+import pytest
+import xarray as xr
+
+from aiweather.forecast import open_forecast
+from aiweather.tracking import (
+    TrackPoint,
+    great_circle_distance_km,
+    track_pressure_minimum,
+)
+
+
+FORECAST_PATH = (
+    "outputs/graphcast_gfs_20260724T000000_240h.zarr"
+)
+
+
+# ---------------------------------------------------------
+# Great-circle distance
+# ---------------------------------------------------------
+
+
+def test_great_circle_distance_zero():
+    distance = great_circle_distance_km(
+        20.0,
+        240.0,
+        20.0,
+        240.0,
+    )
+
+    assert float(distance) == pytest.approx(0.0)
+
+
+def test_great_circle_distance_one_degree_latitude():
+    distance = great_circle_distance_km(
+        21.0,
+        240.0,
+        20.0,
+        240.0,
+    )
+
+    assert float(distance) == pytest.approx(
+        111.2,
+        rel=0.02,
+    )
+
+
+def test_great_circle_distance_wraps_longitude():
+    distance = great_circle_distance_km(
+        20.0,
+        359.0,
+        20.0,
+        1.0,
+    )
+
+    assert float(distance) < 250.0
+
+
+# ---------------------------------------------------------
+# TrackPoint
+# ---------------------------------------------------------
+
+
+def test_track_point_fields():
+    point = TrackPoint(
+        lead_time_hours=24,
+        latitude=15.0,
+        longitude=250.0,
+        pressure=99000.0,
+        pressure_units="Pa",
+        max_wind=20.0,
+        wind_units="m s-1",
+    )
+
+    assert point.lead_time_hours == 24
+    assert point.latitude == pytest.approx(15.0)
+    assert point.longitude == pytest.approx(250.0)
+    assert point.pressure == pytest.approx(99000.0)
+    assert point.pressure_units == "Pa"
+    assert point.max_wind == pytest.approx(20.0)
+    assert point.wind_units == "m s-1"
+
+
+# ---------------------------------------------------------
+# Synthetic pressure tracking
+# ---------------------------------------------------------
+
+
+def test_track_pressure_minimum_known_path():
+    lead_time = np.array(
+        [
+            np.timedelta64(0, "h"),
+            np.timedelta64(6, "h"),
+            np.timedelta64(12, "h"),
+        ]
+    )
+
+    lat = [10.0, 11.0, 12.0]
+    lon = [250.0, 251.0, 252.0]
+
+    pressure = np.full(
+        (3, 3, 3),
+        101000.0,
+    )
+
+    pressure[0, 0, 0] = 99000.0
+    pressure[1, 1, 1] = 98500.0
+    pressure[2, 2, 2] = 98000.0
+
+    da = xr.DataArray(
+        pressure,
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": lead_time,
+            "lat": lat,
+            "lon": lon,
+        },
+    )
+
+    track = track_pressure_minimum(
+        da,
+        initial_latitude=10.0,
+        initial_longitude=250.0,
+        search_radius_km=200.0,
+    )
+
+    assert len(track) == 3
+
+    assert track[0].latitude == pytest.approx(10.0)
+    assert track[0].longitude == pytest.approx(250.0)
+
+    assert track[1].latitude == pytest.approx(11.0)
+    assert track[1].longitude == pytest.approx(251.0)
+
+    assert track[2].latitude == pytest.approx(12.0)
+    assert track[2].longitude == pytest.approx(252.0)
+
+
+def test_track_pressure_minimum_respects_search_radius():
+    lead_time = np.array(
+        [
+            np.timedelta64(0, "h"),
+            np.timedelta64(6, "h"),
+        ]
+    )
+
+    pressure = xr.DataArray(
+        [
+            [
+                [99000.0, 101000.0],
+                [101000.0, 101000.0],
+            ],
+            [
+                [100500.0, 100600.0],
+                [100700.0, 97000.0],
+            ],
+        ],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": lead_time,
+            "lat": [10.0, 20.0],
+            "lon": [250.0, 260.0],
+        },
+    )
+
+    track = track_pressure_minimum(
+        pressure,
+        initial_latitude=10.0,
+        initial_longitude=250.0,
+        search_radius_km=300.0,
+    )
+
+    assert len(track) == 2
+
+    # The tracker must not jump to the distant 97000 Pa low.
+    assert track[1].latitude == pytest.approx(10.0)
+    assert track[1].longitude == pytest.approx(250.0)
+    assert track[1].pressure == pytest.approx(100500.0)
+
+
+def test_track_pressure_minimum_rejects_invalid_radius():
+    pressure = xr.DataArray(
+        np.ones((1, 1, 1)),
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [np.timedelta64(0, "h")],
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    with pytest.raises(ValueError):
+        track_pressure_minimum(
+            pressure,
+            initial_latitude=10.0,
+            initial_longitude=250.0,
+            search_radius_km=0.0,
+        )
+
+
+def test_track_pressure_minimum_rejects_invalid_start_index():
+    pressure = xr.DataArray(
+        np.ones((1, 1, 1)),
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [np.timedelta64(0, "h")],
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    with pytest.raises(ValueError):
+        track_pressure_minimum(
+            pressure,
+            initial_latitude=10.0,
+            initial_longitude=250.0,
+            start_index=5,
+        )
+
+
+# ---------------------------------------------------------
+# Wind diagnostics attached to tracking
+# ---------------------------------------------------------
+
+
+def test_track_pressure_minimum_with_wind():
+    lead_time = np.array(
+        [
+            np.timedelta64(0, "h"),
+        ]
+    )
+
+    pressure = xr.DataArray(
+        [[[99000.0, 100000.0]]],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": lead_time,
+            "lat": [10.0],
+            "lon": [250.0, 251.0],
+        },
+        attrs={"units": "Pa"},
+    )
+
+    u = xr.DataArray(
+        [[[3.0, 5.0]]],
+        dims=("lead_time", "lat", "lon"),
+        coords=pressure.coords,
+        attrs={"units": "m s-1"},
+    )
+
+    v = xr.DataArray(
+        [[[4.0, 12.0]]],
+        dims=("lead_time", "lat", "lon"),
+        coords=pressure.coords,
+        attrs={"units": "m s-1"},
+    )
+
+    track = track_pressure_minimum(
+        pressure,
+        initial_latitude=10.0,
+        initial_longitude=250.0,
+        search_radius_km=300.0,
+        u_wind=u,
+        v_wind=v,
+        wind_radius_km=300.0,
+    )
+
+    assert len(track) == 1
+
+    assert track[0].pressure == pytest.approx(99000.0)
+    assert track[0].pressure_units == "Pa"
+
+    assert track[0].max_wind == pytest.approx(13.0)
+    assert track[0].wind_units == "m s-1"
+
+
+def test_track_without_wind_has_none_intensity():
+    pressure = xr.DataArray(
+        [[[99000.0]]],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [np.timedelta64(0, "h")],
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    track = track_pressure_minimum(
+        pressure,
+        initial_latitude=10.0,
+        initial_longitude=250.0,
+    )
+
+    assert track[0].max_wind is None
+    assert track[0].wind_units is None
+
+
+def test_tracker_requires_both_wind_components():
+    pressure = xr.DataArray(
+        [[[99000.0]]],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [np.timedelta64(0, "h")],
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    u = xr.DataArray(
+        [[[3.0]]],
+        dims=("lead_time", "lat", "lon"),
+        coords=pressure.coords,
+    )
+
+    with pytest.raises(ValueError):
+        track_pressure_minimum(
+            pressure,
+            initial_latitude=10.0,
+            initial_longitude=250.0,
+            u_wind=u,
+        )
+
+
+# ---------------------------------------------------------
+# Real GraphCast integration
+# ---------------------------------------------------------
+
+
+def test_graphcast_candidate_track():
+    forecast = open_forecast(FORECAST_PATH)
+
+    region = forecast.select_region(
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+    )
+
+    track = track_pressure_minimum(
+        region["msl"],
+        initial_latitude=11.5,
+        initial_longitude=257.25,
+        search_radius_km=500.0,
+        start_index=6,
+        u_wind=region["u10m"],
+        v_wind=region["v10m"],
+        wind_radius_km=300.0,
+    )
+
+    assert len(track) == 35
+
+    first = track[0]
+
+    assert first.lead_time_hours == 36
+    assert first.latitude == pytest.approx(11.50)
+    assert first.longitude == pytest.approx(257.25)
+    assert first.pressure == pytest.approx(100444.72, abs=0.1)
+    assert first.max_wind == pytest.approx(14.17, abs=0.02)
+
+    strongest_wind = max(
+        point.max_wind
+        for point in track
+        if point.max_wind is not None
+    )
+
+    assert strongest_wind == pytest.approx(
+        20.28,
+        abs=0.02,
+    )
+
+    # Continuity constraint prevents the large unrelated jump
+    # seen in the unconstrained regional pressure minimum.
+    point_216 = next(
+        point
+        for point in track
+        if point.lead_time_hours == 216
+    )
+
+    assert point_216.latitude == pytest.approx(24.75)
+    assert point_216.longitude == pytest.approx(232.50)
