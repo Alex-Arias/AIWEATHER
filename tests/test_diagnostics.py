@@ -304,3 +304,162 @@ def test_graphcast_wind_direction_remains_lazy():
     )
 
     assert hasattr(direction.data, "compute")
+
+
+
+# ---------------------------------------------------------
+# Pressure minimum
+# ---------------------------------------------------------
+
+
+def test_pressure_minimum_known_field():
+    from aiweather.diagnostics import pressure_minimum
+
+    pressure = xr.DataArray(
+        [
+            [101000.0, 100500.0, 100800.0],
+            [100700.0, 98500.0, 100600.0],
+        ],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [20.0, 21.0],
+            "lon": [240.0, 241.0, 242.0],
+        },
+    )
+
+    minimum = pressure_minimum(pressure)
+
+    assert minimum.value == pytest.approx(98500.0)
+    assert minimum.latitude == pytest.approx(21.0)
+    assert minimum.longitude == pytest.approx(241.0)
+
+
+def test_pressure_minimum_preserves_units():
+    from aiweather.diagnostics import pressure_minimum
+
+    pressure = xr.DataArray(
+        [[101000.0, 99000.0]],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [20.0],
+            "lon": [240.0, 241.0],
+        },
+        attrs={"units": "Pa"},
+    )
+
+    minimum = pressure_minimum(pressure)
+
+    assert minimum.units == "Pa"
+
+
+def test_pressure_minimum_does_not_invent_units():
+    from aiweather.diagnostics import pressure_minimum
+
+    pressure = xr.DataArray(
+        [[101000.0, 99000.0]],
+        dims=("lat", "lon"),
+        coords={
+            "lat": [20.0],
+            "lon": [240.0, 241.0],
+        },
+    )
+
+    minimum = pressure_minimum(pressure)
+
+    assert minimum.units is None
+
+
+def test_pressure_minimum_accepts_singleton_time_dimensions():
+    from aiweather.diagnostics import pressure_minimum
+
+    pressure = xr.DataArray(
+        [[[[101000.0, 98000.0]]]],
+        dims=("time", "lead_time", "lat", "lon"),
+        coords={
+            "time": [np.datetime64("2026-07-24")],
+            "lead_time": [np.timedelta64(0, "h")],
+            "lat": [20.0],
+            "lon": [240.0, 241.0],
+        },
+    )
+
+    minimum = pressure_minimum(pressure)
+
+    assert minimum.value == pytest.approx(98000.0)
+    assert minimum.latitude == pytest.approx(20.0)
+    assert minimum.longitude == pytest.approx(241.0)
+
+
+def test_pressure_minimum_rejects_multiple_lead_times():
+    from aiweather.diagnostics import pressure_minimum
+
+    pressure = xr.DataArray(
+        np.ones((2, 2, 2)),
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [
+                np.timedelta64(0, "h"),
+                np.timedelta64(6, "h"),
+            ],
+            "lat": [20.0, 21.0],
+            "lon": [240.0, 241.0],
+        },
+    )
+
+    with pytest.raises(ValueError):
+        pressure_minimum(pressure)
+
+
+def test_pressure_minimum_rejects_missing_coordinates():
+    from aiweather.diagnostics import pressure_minimum
+
+    pressure = xr.DataArray(
+        np.ones((2, 2)),
+        dims=("y", "x"),
+    )
+
+    with pytest.raises(ValueError):
+        pressure_minimum(pressure)
+
+
+def test_pressure_minimum_rejects_all_nan_field():
+    from aiweather.diagnostics import pressure_minimum
+
+    pressure = xr.DataArray(
+        np.full((2, 2), np.nan),
+        dims=("lat", "lon"),
+        coords={
+            "lat": [20.0, 21.0],
+            "lon": [240.0, 241.0],
+        },
+    )
+
+    with pytest.raises(ValueError):
+        pressure_minimum(pressure)
+
+
+def test_graphcast_regional_pressure_minimum():
+    from aiweather.diagnostics import pressure_minimum
+
+    forecast = open_forecast(FORECAST_PATH)
+
+    region = forecast.select_region(
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+    )
+
+    pressure = region["msl"].isel(
+        time=0,
+        lead_time=0,
+    )
+
+    minimum = pressure_minimum(pressure)
+
+    assert minimum.value == pytest.approx(
+        98127.25
+    )
+
+    assert 5.0 <= minimum.latitude <= 35.0
+    assert 230.0 <= minimum.longitude <= 270.0
