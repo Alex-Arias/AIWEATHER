@@ -2,6 +2,10 @@
 Tracking utilities for AIWeather.
 """
 
+from .classification import (
+    TCClassification,
+    classify_track,
+)
 from .motion import (
     TrackMotion,
     initial_bearing_degrees,
@@ -20,10 +24,12 @@ from .tropical_cyclone import (
 )
 
 __all__ = [
+    "TCClassification",
     "TrackMotion",
     "TrackPoint",
     "TrackRecord",
     "build_track_records",
+    "classify_track",
     "great_circle_distance_km",
     "initial_bearing_degrees",
     "records_to_dataframe",
