@@ -204,6 +204,115 @@ def test_selection_remains_lazy():
 
 
 # ---------------------------------------------------------
+# Valid-time selection
+# ---------------------------------------------------------
+
+
+def test_forecast_valid_time():
+    forecast = open_forecast(FORECAST_PATH)
+
+    valid_time = forecast.valid_time
+
+    assert valid_time.dims == ("lead_time",)
+    assert valid_time.sizes["lead_time"] == 41
+
+    assert valid_time.values[0] == np.datetime64(
+        "2026-07-24T00:00:00.000000000"
+    )
+
+    assert valid_time.values[-1] == np.datetime64(
+        "2026-08-03T00:00:00.000000000"
+    )
+
+
+def test_select_valid_time():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_valid_time(
+        "2026-07-25T00:00:00"
+    )
+
+    assert isinstance(selected, Forecast)
+    assert selected.shape["lead_time"] == 1
+
+    assert selected.lead_time.values[0] == (
+        np.timedelta64(24, "h")
+    )
+
+
+def test_select_valid_time_datetime():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_valid_time(
+        datetime(2026, 7, 26, 0, 0)
+    )
+
+    assert selected.shape["lead_time"] == 1
+
+    assert selected.lead_time.values[0] == (
+        np.timedelta64(48, "h")
+    )
+
+
+def test_select_valid_time_numpy_datetime64():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_valid_time(
+        np.datetime64("2026-07-27T00:00:00")
+    )
+
+    assert selected.shape["lead_time"] == 1
+
+    assert selected.lead_time.values[0] == (
+        np.timedelta64(72, "h")
+    )
+
+
+def test_select_valid_time_invalid():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select_valid_time(
+            "2026-08-10T00:00:00"
+        )
+
+
+def test_valid_time_selection_preserves_metadata():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_valid_time(
+        "2026-07-26T00:00:00"
+    )
+
+    assert selected.metadata == forecast.metadata
+
+
+def test_valid_time_selection_remains_lazy():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_valid_time(
+        "2026-07-25T00:00:00"
+    )
+
+    assert hasattr(
+        selected.dataset["t2m"].data,
+        "compute",
+    )
+
+
+def test_valid_time_matches_lead_time():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select_valid_time(
+        "2026-07-29T00:00:00"
+    )
+
+    assert selected.lead_time.values[0] == (
+        np.timedelta64(120, "h")
+    )
+
+
+# ---------------------------------------------------------
 # Spatial point selection
 # ---------------------------------------------------------
 

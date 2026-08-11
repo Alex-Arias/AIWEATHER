@@ -114,6 +114,43 @@ class Forecast:
 
         return None
 
+    @property
+    def valid_time(self) -> xr.DataArray:
+        """
+        Forecast valid times derived from initialization time and lead time.
+
+        Returns
+        -------
+        xr.DataArray
+            One valid datetime for each forecast lead time.
+
+        Raises
+        ------
+        ValueError
+            If the dataset does not contain the required time or
+            lead_time coordinates.
+        """
+        if "time" not in self.dataset.coords:
+            raise ValueError(
+                "Forecast dataset does not contain an initialization "
+                "time coordinate."
+            )
+
+        if "lead_time" not in self.dataset.coords:
+            raise ValueError(
+                "Forecast dataset does not contain a lead_time "
+                "coordinate."
+            )
+
+        initialization_time = self.dataset["time"]
+
+        # The dataset contains one initialization time and a vector
+        # of timedelta64 lead times. Xarray handles the broadcasting
+        # and preserves the datetime64 dtype.
+        return initialization_time.isel(time=0) + self.dataset["lead_time"]
+
+
+
     # ---------------------------------------------------------
     # Coordinate utilities
     # ---------------------------------------------------------
@@ -332,6 +369,70 @@ class Forecast:
                 int(matches[0]),
                 int(matches[0]) + 1,
             )
+        )
+
+        return Forecast(
+            dataset=dataset,
+            metadata=self.metadata,
+        )
+
+    def select_valid_time(
+        self,
+        valid_time: datetime | np.datetime64 | str,
+    ) -> Forecast:
+        """
+        Return a new Forecast containing one selected valid time.
+
+        Parameters
+        ----------
+        valid_time : datetime, numpy.datetime64, or str
+            Forecast valid time. Strings accepted by
+            numpy.datetime64 are supported.
+
+        Returns
+        -------
+        Forecast
+            Forecast containing the selected valid time.
+
+        Raises
+        ------
+        ValueError
+            If the requested valid time is not available.
+        """
+
+        if "time" not in self.dataset.coords:
+            raise ValueError(
+                "Forecast dataset does not contain an initialization "
+                "time coordinate."
+            )
+
+        if "lead_time" not in self.dataset.coords:
+            raise ValueError(
+                "Forecast dataset does not contain a lead_time "
+                "coordinate."
+            )
+
+        requested_time = np.datetime64(valid_time)
+
+        valid_times = self.valid_time.values
+
+        matches = np.flatnonzero(valid_times == requested_time)
+
+        if len(matches) == 0:
+            available = [
+                str(value)
+                for value in valid_times
+            ]
+
+            raise ValueError(
+                f"Valid time {requested_time} is not available. "
+                f"Available valid times: {available}"
+            )
+
+        index = int(matches[0])
+
+        dataset = self.dataset.isel(
+            lead_time=slice(index, index + 1)
         )
 
         return Forecast(
