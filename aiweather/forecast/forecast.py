@@ -320,61 +320,6 @@ class Forecast:
     # Lead-time selection
     # ---------------------------------------------------------
 
-    def select_lead_time(self, lead_time: int) -> Forecast:
-        """
-        Return a new Forecast containing one selected lead time.
-
-        Parameters
-        ----------
-        lead_time : int
-            Forecast lead time in hours.
-
-        Returns
-        -------
-        Forecast
-            Forecast containing the selected lead time.
-
-        Raises
-        ------
-        ValueError
-            If the requested lead time is not available.
-        """
-
-        if "lead_time" not in self.dataset.coords:
-            raise ValueError(
-                "Forecast dataset does not contain a lead_time coordinate."
-            )
-
-        # Convert timedelta64[h] values to integer hours before
-        # comparing with the user-supplied integer lead time.
-        lead_hours = (
-            self.dataset["lead_time"]
-            .values
-            .astype("timedelta64[h]")
-            .astype(int)
-        )
-
-        matches = np.flatnonzero(lead_hours == lead_time)
-
-        if len(matches) == 0:
-            available = lead_hours.tolist()
-
-            raise ValueError(
-                f"Lead time {lead_time} h is not available. "
-                f"Available lead times: {available}"
-            )
-
-        dataset = self.dataset.isel(
-            lead_time=slice(
-                int(matches[0]),
-                int(matches[0]) + 1,
-            )
-        )
-
-        return Forecast(
-            dataset=dataset,
-            metadata=self.metadata,
-        )
 
     def select_valid_time(
         self,
@@ -439,6 +384,322 @@ class Forecast:
             dataset=dataset,
             metadata=self.metadata,
         )
+
+
+    # ---------------------------------------------------------
+    # Combined forecast selection
+    # ---------------------------------------------------------
+
+    def select(
+        self,
+        *,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        valid_time: str | datetime | np.datetime64 | None = None,
+        variables: list[str] | tuple[str, ...] | None = None,
+    ) -> xr.Dataset:
+        """
+        Select a subset of the forecast by location, valid time,
+        and variables.
+
+        Parameters
+        ----------
+        latitude : float, optional
+            Latitude in degrees. If provided, the nearest grid point
+            is selected.
+
+        longitude : float, optional
+            Longitude in degrees. Values in either [-180, 180) or
+            [0, 360) are accepted. If provided, the nearest grid
+            point is selected.
+
+        valid_time : str, datetime, np.datetime64, optional
+            Forecast valid time. If provided, the nearest matching
+            forecast valid time is selected.
+
+        variables : list or tuple of str, optional
+            Variables to retain. If omitted, all forecast variables
+            are returned.
+
+        Returns
+        -------
+        xr.Dataset
+            Selected forecast subset.
+
+        Raises
+        ------
+        ValueError
+            If no selection criteria are provided, the requested
+            coordinates are invalid, or the valid time is unavailable.
+
+        KeyError
+            If a requested variable does not exist.
+        """
+
+        if (
+            latitude is None
+            and longitude is None
+            and valid_time is None
+            and variables is None
+        ):
+            raise ValueError(
+                "At least one selection criterion must be provided."
+            )
+
+        dataset = self.dataset
+
+        # -----------------------------------------------------
+        # Validate that latitude and longitude are supplied
+        # together.
+        # -----------------------------------------------------
+
+        if (latitude is None) != (longitude is None):
+            raise ValueError(
+                "latitude and longitude must be provided together."
+            )
+
+        # -----------------------------------------------------
+        # Spatial selection
+        # -----------------------------------------------------
+
+        if latitude is not None and longitude is not None:
+            point = self.select_point(
+                latitude=latitude,
+                longitude=longitude,
+            )
+
+            dataset = point
+
+        # -----------------------------------------------------
+        # Valid-time selection
+        # -----------------------------------------------------
+
+        if valid_time is not None:
+            valid_times = self.valid_time.values
+
+            requested_time = np.datetime64(valid_time)
+
+            matches = np.flatnonzero(
+                valid_times == requested_time
+            )
+
+            if len(matches) == 0:
+                available = [
+                    str(value)
+                    for value in valid_times
+                ]
+
+                raise ValueError(
+                    f"Valid time {requested_time} is not available. "
+                    f"Available valid times: {available}"
+                )
+
+            lead_index = int(matches[0])
+
+            dataset = dataset.isel(
+                lead_time=slice(
+                    lead_index,
+                    lead_index + 1,
+                )
+            )
+
+        # -----------------------------------------------------
+        # Variable selection
+        # -----------------------------------------------------
+
+        if variables is not None:
+            requested_variables = list(variables)
+
+            missing = [
+                name
+                for name in requested_variables
+                if name not in dataset.data_vars
+            ]
+
+            if missing:
+                raise KeyError(
+                    f"Forecast variable(s) not found: {missing}. "
+                    f"Available variables: "
+                    f"{list(dataset.data_vars)}"
+                )
+
+            dataset = dataset[requested_variables]
+
+        return dataset
+
+    # ---------------------------------------------------------
+    # Regional selection
+    # ---------------------------------------------------------
+
+    def select_region(
+        self,
+        *,
+        lat_min: float,
+        lat_max: float,
+        lon_min: float,
+        lon_max: float,
+    ) -> xr.Dataset:
+        """
+        Select a geographic region from the forecast.
+
+        Parameters
+        ----------
+        lat_min : float
+            Southern latitude boundary in degrees.
+
+        lat_max : float
+            Northern latitude boundary in degrees.
+
+        lon_min : float
+            Western longitude boundary in degrees. Values in either
+            [-180, 180) or [0, 360) are accepted.
+
+        lon_max : float
+            Eastern longitude boundary in degrees. Values in either
+            [-180, 180) or [0, 360) are accepted.
+
+        Returns
+        -------
+        xr.Dataset
+            Forecast data restricted to the requested region.
+
+        Raises
+        ------
+        ValueError
+            If the latitude or longitude bounds are invalid, or if
+            the requested region crosses the 0/360 longitude seam.
+        """
+
+        if not -90.0 <= lat_min <= 90.0:
+            raise ValueError(
+                f"lat_min must be between -90 and 90 degrees. "
+                f"Received: {lat_min}"
+            )
+
+        if not -90.0 <= lat_max <= 90.0:
+            raise ValueError(
+                f"lat_max must be between -90 and 90 degrees. "
+                f"Received: {lat_max}"
+            )
+
+        if lat_min > lat_max:
+            raise ValueError(
+                f"lat_min must be less than or equal to lat_max. "
+                f"Received lat_min={lat_min}, lat_max={lat_max}"
+            )
+
+        if not -360.0 <= lon_min <= 360.0:
+            raise ValueError(
+                f"lon_min must be between -360 and 360 degrees. "
+                f"Received: {lon_min}"
+            )
+
+        if not -360.0 <= lon_max <= 360.0:
+            raise ValueError(
+                f"lon_max must be between -360 and 360 degrees. "
+                f"Received: {lon_max}"
+            )
+
+        if self.latitude is None:
+            raise ValueError(
+                "Forecast dataset does not contain a latitude coordinate."
+            )
+
+        if self.longitude is None:
+            raise ValueError(
+                "Forecast dataset does not contain a longitude coordinate."
+            )
+
+        normalized_lon_min = self._normalize_longitude(lon_min)
+        normalized_lon_max = self._normalize_longitude(lon_max)
+
+        if normalized_lon_min > normalized_lon_max:
+            raise ValueError(
+                "Requested longitude region crosses the 0/360 degree "
+                "longitude seam. Split the request into two regions."
+            )
+
+        lat_values = self.latitude.values
+        lon_values = self.longitude.values
+
+        lat_slice = (
+            slice(lat_min, lat_max)
+            if lat_values[0] < lat_values[-1]
+            else slice(lat_max, lat_min)
+        )
+
+        lon_slice = (
+            slice(normalized_lon_min, normalized_lon_max)
+            if lon_values[0] < lon_values[-1]
+            else slice(normalized_lon_max, normalized_lon_min)
+        )
+
+        return self.dataset.sel(
+            lat=lat_slice,
+            lon=lon_slice,
+        )
+
+
+
+    def select_lead_time(self, lead_time: int) -> Forecast:
+        """
+        Return a new Forecast containing one selected lead time.
+
+        Parameters
+        ----------
+        lead_time : int
+            Forecast lead time in hours.
+
+        Returns
+        -------
+        Forecast
+            Forecast containing the selected lead time.
+
+        Raises
+        ------
+        ValueError
+            If the requested lead time is not available.
+        """
+
+        if "lead_time" not in self.dataset.coords:
+            raise ValueError(
+                "Forecast dataset does not contain a lead_time coordinate."
+            )
+
+        # Convert timedelta64[h] values to integer hours before
+        # comparing with the user-supplied integer lead time.
+        lead_hours = (
+            self.dataset["lead_time"]
+            .values
+            .astype("timedelta64[h]")
+            .astype(int)
+        )
+
+        matches = np.flatnonzero(lead_hours == lead_time)
+
+        if len(matches) == 0:
+            available = lead_hours.tolist()
+
+            raise ValueError(
+                f"Lead time {lead_time} h is not available. "
+                f"Available lead times: {available}"
+            )
+
+        dataset = self.dataset.isel(
+            lead_time=slice(
+                int(matches[0]),
+                int(matches[0]) + 1,
+            )
+        )
+
+        return Forecast(
+            dataset=dataset,
+            metadata=self.metadata,
+        )
+
+
+
+
 
 
 def _metadata_from_path(

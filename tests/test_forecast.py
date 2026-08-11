@@ -313,6 +313,143 @@ def test_valid_time_matches_lead_time():
 
 
 # ---------------------------------------------------------
+# Combined forecast selection
+# ---------------------------------------------------------
+
+
+def test_select_by_point_and_valid_time():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select(
+        latitude=31.86,
+        longitude=-116.67,
+        valid_time="2026-07-25T00:00:00",
+    )
+
+    assert selected.sizes["time"] == 1
+    assert selected.sizes["lead_time"] == 1
+
+    assert selected["lat"].item() == pytest.approx(31.75)
+    assert selected["lon"].item() == pytest.approx(243.25)
+
+    assert selected["lead_time"].values[0] == (
+        np.timedelta64(24, "h")
+    )
+
+
+def test_select_by_point_and_valid_time_with_variables():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select(
+        latitude=31.86,
+        longitude=-116.67,
+        valid_time="2026-07-25T00:00:00",
+        variables=["t2m", "msl", "u10m", "v10m"],
+    )
+
+    assert set(selected.data_vars) == {
+        "t2m",
+        "msl",
+        "u10m",
+        "v10m",
+    }
+
+    assert selected.sizes["lead_time"] == 1
+
+
+def test_select_accepts_0360_longitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select(
+        latitude=31.86,
+        longitude=243.33,
+        valid_time="2026-07-25T00:00:00",
+    )
+
+    assert selected["lat"].item() == pytest.approx(31.75)
+    assert selected["lon"].item() == pytest.approx(243.25)
+
+
+def test_select_variable_subset():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select(
+        variables=["t2m", "msl"],
+    )
+
+    assert set(selected.data_vars) == {
+        "t2m",
+        "msl",
+    }
+
+
+def test_select_valid_time_only():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select(
+        valid_time="2026-07-26T00:00:00",
+    )
+
+    assert selected.sizes["lead_time"] == 1
+    assert selected["lead_time"].values[0] == (
+        np.timedelta64(48, "h")
+    )
+
+
+def test_select_preserves_lazy_loading():
+    forecast = open_forecast(FORECAST_PATH)
+
+    selected = forecast.select(
+        latitude=31.86,
+        longitude=-116.67,
+        valid_time="2026-07-25T00:00:00",
+        variables=["t2m"],
+    )
+
+    assert hasattr(
+        selected["t2m"].data,
+        "compute",
+    )
+
+
+def test_select_invalid_valid_time():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select(
+            valid_time="2026-08-10T00:00:00",
+        )
+
+
+def test_select_requires_latitude_and_longitude_together():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select(
+            latitude=31.86,
+        )
+
+
+def test_select_requires_selection_criteria():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select()
+
+
+def test_select_missing_variable():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(KeyError):
+        forecast.select(
+            variables=["t2m", "not_a_real_variable"],
+        )
+
+
+
+
+
+# ---------------------------------------------------------
 # Spatial point selection
 # ---------------------------------------------------------
 
@@ -398,3 +535,150 @@ def test_select_point_invalid_longitude():
             latitude=31.86,
             longitude=400.0,
         )
+
+# ---------------------------------------------------------
+# Regional selection
+# ---------------------------------------------------------
+
+
+def test_select_region_negative_longitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    region = forecast.select_region(
+        lat_min=20.0,
+        lat_max=35.0,
+        lon_min=-120.0,
+        lon_max=-105.0,
+    )
+
+    assert region.sizes["lat"] > 0
+    assert region.sizes["lon"] > 0
+    assert region.sizes["time"] == 1
+    assert region.sizes["lead_time"] == 41
+
+    assert region["lon"].min().item() >= 240.0
+    assert region["lon"].max().item() <= 255.0
+
+
+def test_select_region_0360_longitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    region = forecast.select_region(
+        lat_min=20.0,
+        lat_max=35.0,
+        lon_min=240.0,
+        lon_max=255.0,
+    )
+
+    assert region.sizes["lat"] > 0
+    assert region.sizes["lon"] > 0
+    assert region.sizes["time"] == 1
+    assert region.sizes["lead_time"] == 41
+
+
+def test_select_region_negative_and_0360_are_equivalent():
+    forecast = open_forecast(FORECAST_PATH)
+
+    region_negative = forecast.select_region(
+        lat_min=20.0,
+        lat_max=35.0,
+        lon_min=-120.0,
+        lon_max=-105.0,
+    )
+
+    region_360 = forecast.select_region(
+        lat_min=20.0,
+        lat_max=35.0,
+        lon_min=240.0,
+        lon_max=255.0,
+    )
+
+    np.testing.assert_array_equal(
+        region_negative["lat"].values,
+        region_360["lat"].values,
+    )
+
+    np.testing.assert_array_equal(
+        region_negative["lon"].values,
+        region_360["lon"].values,
+    )
+
+
+def test_select_region_handles_descending_latitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    region = forecast.select_region(
+        lat_min=20.0,
+        lat_max=35.0,
+        lon_min=-120.0,
+        lon_max=-105.0,
+    )
+
+    assert region["lat"].values[0] > region["lat"].values[-1]
+
+
+def test_select_region_invalid_latitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select_region(
+            lat_min=-95.0,
+            lat_max=35.0,
+            lon_min=-120.0,
+            lon_max=-105.0,
+        )
+
+
+def test_select_region_invalid_latitude_order():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select_region(
+            lat_min=35.0,
+            lat_max=20.0,
+            lon_min=-120.0,
+            lon_max=-105.0,
+        )
+
+
+def test_select_region_invalid_longitude():
+    forecast = open_forecast(FORECAST_PATH)
+
+    with pytest.raises(ValueError):
+        forecast.select_region(
+            lat_min=20.0,
+            lat_max=35.0,
+            lon_min=-400.0,
+            lon_max=-105.0,
+        )
+
+
+def test_select_region_preserves_lazy_loading():
+    forecast = open_forecast(FORECAST_PATH)
+
+    region = forecast.select_region(
+        lat_min=20.0,
+        lat_max=35.0,
+        lon_min=-120.0,
+        lon_max=-105.0,
+    )
+
+    assert hasattr(
+        region["t2m"].data,
+        "compute",
+    )
+
+
+def test_select_region_does_not_modify_original_forecast():
+    forecast = open_forecast(FORECAST_PATH)
+
+    original_shape = dict(forecast.shape)
+
+    forecast.select_region(
+        lat_min=20.0,
+        lat_max=35.0,
+        lon_min=-120.0,
+        lon_max=-105.0,
+    )
+
+    assert dict(forecast.shape) == original_shape
