@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import torch
 import xarray as xr
 
 from .records import TrackRecord
@@ -187,6 +186,8 @@ def _build_input_tensor(
 
         [batch, variable, lat, lon]
     """
+    import torch
+
     arrays = []
 
     for name in variables:
@@ -206,9 +207,7 @@ def _build_input_tensor(
             dtype=np.float32,
         )
 
-        arrays.append(
-            values
-        )
+        arrays.append(values)
 
     stacked = np.stack(
         arrays,
@@ -359,6 +358,8 @@ def run_earth2studio_tracker(
     list[Earth2StudioTrack]
         All paths accumulated by the tracker.
     """
+    import torch
+
     _validate_dataset(
         dataset
     )

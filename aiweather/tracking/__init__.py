@@ -45,6 +45,12 @@ from .earth2studio import (
     select_regional_track,
 )
 
+from .comparison import (
+    TrackComparison,
+    align_tracks,
+    compare_tracks,
+)
+
 __all__ = [
     "TCClassification",
     "TrackMotion",
@@ -71,4 +77,8 @@ __all__ = [
     "run_vitart_tracker",
     "run_wuduan_tracker",
     "select_regional_track",
+    "TrackComparison",
+    "align_tracks",
+    "compare_tracks",
+
 ]

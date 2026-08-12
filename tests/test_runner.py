@@ -3,7 +3,28 @@ from pathlib import Path
 from aiweather.forecast import ForecastRequest
 from aiweather.output import OutputManager
 from aiweather.runners import create_runner
+import sys
+import types
 
+class FakeZarrBackend:
+    def __init__(self, path):
+        self.path = path
+
+
+def install_fake_earth2studio_io(
+    monkeypatch,
+):
+    module = types.ModuleType(
+        "earth2studio.io"
+    )
+
+    module.ZarrBackend = FakeZarrBackend
+
+    monkeypatch.setitem(
+        sys.modules,
+        "earth2studio.io",
+        module,
+    )
 
 def test_runner_factory():
     """Verify that the runner factory can create a GraphCast runner."""
@@ -67,6 +88,10 @@ def test_runner_build_output_uses_canonical_path(
         tmp_path,
     )
 
+    install_fake_earth2studio_io(
+        monkeypatch
+    )
+
     request = ForecastRequest(
         model="graphcast",
         datasource="gfs",
@@ -93,11 +118,16 @@ def test_runner_build_output_uses_canonical_path(
     assert Path(output_path) == expected
     assert Path(request.output_path) == expected
     assert runner.io is not None
-
+    assert Path(runner.io.path) == expected
 
 def test_runner_build_output_preserves_explicit_path(
     tmp_path,
+    monkeypatch,
 ):
+    install_fake_earth2studio_io(
+        monkeypatch
+    )
+
     explicit = (
         tmp_path
         / "custom"
@@ -129,3 +159,4 @@ def test_runner_build_output_preserves_explicit_path(
     assert Path(output_path) == explicit
     assert Path(request.output_path) == explicit
     assert runner.io is not None
+    assert Path(runner.io.path) == explicit

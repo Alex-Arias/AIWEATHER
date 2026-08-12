@@ -4,17 +4,6 @@ Generic runner for Earth2Studio prognostic (PX) models.
 
 from __future__ import annotations
 
-from earth2studio.io import ZarrBackend
-
-from aiweather.backends.earth2studio import (
-    load_px_model,
-    load_data_source,
-)
-
-from aiweather.backends.earth2studio.inference import (
-    run_forecast,
-)
-
 from aiweather.output import OutputManager
 
 from .base_runner import BaseRunner
@@ -39,35 +28,62 @@ class PXRunner(BaseRunner):
 
     def load_model(self):
 
+        from aiweather.backends.earth2studio import (
+            load_px_model,
+        )
+
         self._check_model_name()
 
         print()
         print(f"Loading {self.MODEL_NAME}...")
 
-        self.model = load_px_model(self.MODEL_NAME)
+        self.model = load_px_model(
+            self.MODEL_NAME
+        )
 
-        print(f"{self.MODEL_NAME} loaded.")
+        print(
+            f"{self.MODEL_NAME} loaded."
+        )
 
     def load_data(self):
+
+        from aiweather.backends.earth2studio import (
+            load_data_source,
+        )
 
         self._check_model_name()
 
         print()
-        print(f"Initializing datasource for {self.MODEL_NAME}...")
+        print(
+            f"Initializing datasource for "
+            f"{self.MODEL_NAME}..."
+        )
 
-        self.data = load_data_source(self.MODEL_NAME)
+        self.data = load_data_source(
+            self.MODEL_NAME
+        )
 
-        print("Datasource initialized.")
-
+        print(
+            "Datasource initialized."
+        )
 
     def run_forecast(self, request):
 
+        from aiweather.backends.earth2studio.inference import (
+            run_forecast,
+        )
+
         print()
-        print("Running deterministic forecast...")
+        print(
+            "Running deterministic forecast..."
+        )
 
         run_forecast(
             time=request.init_time,
-            nsteps=request.lead_time // self.MODEL_TIMESTEP,
+            nsteps=(
+                request.lead_time
+                // self.MODEL_TIMESTEP
+            ),
             prognostic=self.model,
             data=self.data,
             io=self.io,
@@ -79,4 +95,6 @@ class PXRunner(BaseRunner):
         )
 
         print()
-        print("Forecast completed.")
+        print(
+            "Forecast completed."
+        )

@@ -6,8 +6,6 @@ from __future__ import annotations
 
 import time
 
-import torch
-
 
 class BaseRunner:
 
@@ -28,10 +26,17 @@ class BaseRunner:
 
         if request.device == "cuda":
 
-            if not torch.cuda.is_available():
-                raise RuntimeError("CUDA device not available.")
+            import torch
 
-            print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+            if not torch.cuda.is_available():
+                raise RuntimeError(
+                    "CUDA device not available."
+                )
+
+            print(
+                f"Using GPU: "
+                f"{torch.cuda.get_device_name(0)}"
+            )
 
         elif request.device == "cpu":
 
@@ -42,6 +47,7 @@ class BaseRunner:
             raise ValueError(
                 f"Unknown device: {request.device}"
             )
+
 
     # ---------------------------------------------------------
     # Output
