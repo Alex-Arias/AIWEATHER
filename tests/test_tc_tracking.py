@@ -378,3 +378,227 @@ def test_graphcast_candidate_track():
 
     assert point_216.latitude == pytest.approx(24.75)
     assert point_216.longitude == pytest.approx(232.50)
+
+# ---------------------------------------------------------
+# Automatic tracking from genesis
+# ---------------------------------------------------------
+
+
+def test_track_from_genesis():
+    from aiweather.tracking import (
+        GenesisResult,
+        track_from_genesis,
+    )
+
+    lead_time = np.array(
+        [
+            np.timedelta64(0, "h"),
+            np.timedelta64(6, "h"),
+            np.timedelta64(12, "h"),
+        ]
+    )
+
+    pressure = xr.DataArray(
+        [
+            [
+                [101000.0, 101000.0],
+                [101000.0, 101000.0],
+            ],
+            [
+                [99000.0, 101000.0],
+                [101000.0, 101000.0],
+            ],
+            [
+                [101000.0, 101000.0],
+                [101000.0, 98000.0],
+            ],
+        ],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": lead_time,
+            "lat": [10.0, 11.0],
+            "lon": [250.0, 251.0],
+        },
+    )
+
+    genesis = GenesisResult(
+        track_index=0,
+        genesis_lead_time_hours=6,
+        latitude=10.0,
+        longitude=250.0,
+        pressure=99000.0,
+        max_wind=18.0,
+        qualifying_points=3,
+    )
+
+    track = track_from_genesis(
+        pressure,
+        genesis=genesis,
+        search_radius_km=200.0,
+    )
+
+    assert len(track) == 2
+    assert track[0].lead_time_hours == 6
+    assert track[0].latitude == pytest.approx(10.0)
+    assert track[0].longitude == pytest.approx(250.0)
+    assert track[1].lead_time_hours == 12
+
+
+def test_track_from_genesis_invalid_lead_time():
+    from aiweather.tracking import (
+        GenesisResult,
+        track_from_genesis,
+    )
+
+    pressure = xr.DataArray(
+        [[[99000.0]]],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [np.timedelta64(0, "h")],
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    genesis = GenesisResult(
+        track_index=0,
+        genesis_lead_time_hours=6,
+        latitude=10.0,
+        longitude=250.0,
+        pressure=99000.0,
+        max_wind=18.0,
+        qualifying_points=3,
+    )
+
+    with pytest.raises(ValueError):
+        track_from_genesis(
+            pressure,
+            genesis=genesis,
+        )
+
+
+def test_track_from_genesis_rejects_invalid_object():
+    from aiweather.tracking import track_from_genesis
+
+    pressure = xr.DataArray(
+        [[[99000.0]]],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [np.timedelta64(0, "h")],
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    with pytest.raises(TypeError):
+        track_from_genesis(
+            pressure,
+            genesis=object(),
+        )
+
+
+def test_graphcast_track_from_detected_genesis():
+    from aiweather.diagnostics import detect_pressure_minima
+
+    from aiweather.tracking import (
+        associate_candidates,
+        detect_genesis,
+        select_first_genesis,
+        track_from_genesis,
+    )
+
+    forecast = open_forecast(
+        FORECAST_PATH
+    )
+
+    region = forecast.select_region(
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+    )
+
+    lead_values = (
+        region["lead_time"]
+        .values
+        .astype("timedelta64[h]")
+        .astype(int)
+    )
+
+    candidates_by_lead = []
+
+    for lead_hours in range(
+        24,
+        175,
+        6,
+    ):
+        matches = np.flatnonzero(
+            lead_values == lead_hours
+        )
+
+        if len(matches) == 0:
+            continue
+
+        pressure = region["msl"].isel(
+            time=0,
+            lead_time=int(matches[0]),
+        )
+
+        minima = detect_pressure_minima(
+            pressure,
+            max_candidates=5,
+            minimum_separation_km=500.0,
+        )
+
+        candidates_by_lead.append(
+            (
+                lead_hours,
+                minima,
+            )
+        )
+
+    candidate_tracks = associate_candidates(
+        candidates_by_lead,
+        maximum_displacement_km=500.0,
+    )
+
+    genesis_results = detect_genesis(
+        candidate_tracks,
+        u_wind=region["u10m"],
+        v_wind=region["v10m"],
+        minimum_wind=17.0,
+        maximum_pressure=100500.0,
+        minimum_consecutive_points=3,
+        wind_radius_km=300.0,
+    )
+
+    genesis = select_first_genesis(
+        genesis_results
+    )
+
+    assert genesis is not None
+
+    track = track_from_genesis(
+        region["msl"],
+        genesis=genesis,
+        u_wind=region["u10m"],
+        v_wind=region["v10m"],
+        search_radius_km=500.0,
+        wind_radius_km=300.0,
+    )
+
+    assert len(track) == 32
+
+    first = track[0]
+
+    assert first.lead_time_hours == 54
+    assert first.latitude == pytest.approx(13.0)
+    assert first.longitude == pytest.approx(254.0)
+    assert first.pressure == pytest.approx(
+        100306.69,
+        abs=0.1,
+    )
+
+    last = track[-1]
+
+    assert last.lead_time_hours == 240

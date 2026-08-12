@@ -454,3 +454,99 @@ def track_pressure_minimum(
         )
 
     return track
+
+def track_from_genesis(
+    pressure: xr.DataArray,
+    *,
+    genesis,
+    u_wind: xr.DataArray | None = None,
+    v_wind: xr.DataArray | None = None,
+    search_radius_km: float = 500.0,
+    wind_radius_km: float = 300.0,
+) -> list[TrackPoint]:
+    """
+    Track a pressure minimum beginning from a detected genesis point.
+
+    Parameters
+    ----------
+    pressure : xr.DataArray
+        Sea-level pressure field containing a lead_time dimension.
+
+    genesis
+        GenesisResult-like object containing:
+        ``genesis_lead_time_hours``, ``latitude``, and ``longitude``.
+
+    u_wind, v_wind : xr.DataArray, optional
+        Zonal and meridional wind components. Both must be supplied
+        together when wind intensity should be attached to TrackPoint.
+
+    search_radius_km : float, default=500
+        Maximum displacement allowed between consecutive centers.
+
+    wind_radius_km : float, default=300
+        Radius used to calculate local maximum wind speed.
+
+    Returns
+    -------
+    list[TrackPoint]
+        Track beginning at the detected genesis lead time.
+
+    Raises
+    ------
+    TypeError
+        If genesis does not provide the required attributes.
+
+    ValueError
+        If the genesis lead time is not available in the pressure
+        field.
+    """
+    required_attributes = (
+        "genesis_lead_time_hours",
+        "latitude",
+        "longitude",
+    )
+
+    for attribute in required_attributes:
+        if not hasattr(genesis, attribute):
+            raise TypeError(
+                "genesis must provide "
+                "'genesis_lead_time_hours', "
+                "'latitude', and 'longitude'."
+            )
+
+    if "lead_time" not in pressure.coords:
+        raise ValueError(
+            "pressure does not contain a 'lead_time' coordinate."
+        )
+
+    lead_hours = (
+        pressure["lead_time"]
+        .values
+        .astype("timedelta64[h]")
+        .astype(int)
+    )
+
+    matches = np.flatnonzero(
+        lead_hours
+        == int(genesis.genesis_lead_time_hours)
+    )
+
+    if len(matches) == 0:
+        raise ValueError(
+            "Genesis lead time "
+            f"{genesis.genesis_lead_time_hours} h "
+            "is not available in the pressure field."
+        )
+
+    start_index = int(matches[0])
+
+    return track_pressure_minimum(
+        pressure,
+        initial_latitude=float(genesis.latitude),
+        initial_longitude=float(genesis.longitude),
+        search_radius_km=search_radius_km,
+        start_index=start_index,
+        u_wind=u_wind,
+        v_wind=v_wind,
+        wind_radius_km=wind_radius_km,
+    )

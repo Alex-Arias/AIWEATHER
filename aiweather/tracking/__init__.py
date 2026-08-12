@@ -21,6 +21,7 @@ from .tropical_cyclone import (
     TrackPoint,
     great_circle_distance_km,
     track_pressure_minimum,
+    track_from_genesis,
 )
 
 from .association import (
@@ -54,4 +55,5 @@ __all__ = [
     "GenesisResult",
     "detect_genesis",
     "select_first_genesis",
+    "track_from_genesis",
 ]
