@@ -56,6 +56,11 @@ from .selection import (
     select_matching_track,
 )
 
+from .evaluation import (
+    TrackerEvaluation,
+    compare_tracker_ensemble,
+)
+
 __all__ = [
     "TCClassification",
     "TrackMotion",
@@ -87,5 +92,7 @@ __all__ = [
     "compare_tracks",
     "TrackMatch",
     "select_matching_track",
+    "TrackerEvaluation",
+    "compare_tracker_ensemble",
 
 ]
