@@ -47,26 +47,34 @@ class BaseRunner:
     # Output
     # ---------------------------------------------------------
 
+
     def build_output(self, request):
 
-        output_dir = request.output_path or "outputs"
+        from earth2studio.io import ZarrBackend
 
-        os.makedirs(output_dir, exist_ok=True)
+        from aiweather.output import OutputManager
 
-        filename = (
-            f"{request.model}_"
-            f"{request.datasource}_"
-            f"{request.init_time.replace(':','').replace('-','')}_"
-            f"{request.lead_time}h.zarr"
+        if request.output_path is None:
+            output_path = OutputManager.build_output_path(
+                request
+            )
+        else:
+            output_path = request.output_path
+
+        request.output_path = output_path
+
+        self.io = ZarrBackend(
+            output_path
         )
 
-        output_file = os.path.join(output_dir, filename)
+        print()
+        print(f"Output: {output_path}")
 
-        self.io = ZarrBackend(output_file)
+        return output_path
 
-        return output_file
 
-    
+
+
     # ---------------------------------------------------------
     # Cleanup
     # ---------------------------------------------------------
@@ -103,5 +111,3 @@ class BaseRunner:
         #print(f"Finished in {elapsed:.1f} seconds")
 
         return None
-
-   

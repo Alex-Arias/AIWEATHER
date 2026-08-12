@@ -59,21 +59,6 @@ class PXRunner(BaseRunner):
 
         print("Datasource initialized.")
 
-    def build_output(self, request):
-
-        if request.output_path is None:
-            output_path = OutputManager.build_output_path(request)
-        else:
-            output_path = request.output_path
-
-        request.output_path = output_path
-
-        self.io = ZarrBackend(output_path)
-
-        print()
-        print(f"Output: {output_path}")
-
-        return output_path
 
     def run_forecast(self, request):
 
@@ -86,6 +71,11 @@ class PXRunner(BaseRunner):
             prognostic=self.model,
             data=self.data,
             io=self.io,
+        )
+
+        OutputManager.write_forecast_metadata(
+            request.output_path,
+            request,
         )
 
         print()

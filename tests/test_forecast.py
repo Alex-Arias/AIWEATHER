@@ -11,7 +11,7 @@ from aiweather.forecast import (
 
 
 FORECAST_PATH = (
-    "outputs/graphcast_gfs_20260724T000000_240h.zarr"
+    "outputs/graphcast/20260724T000000/forecast.zarr"
 )
 
 

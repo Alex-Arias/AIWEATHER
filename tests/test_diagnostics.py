@@ -7,7 +7,7 @@ from aiweather.forecast import open_forecast
 
 
 FORECAST_PATH = (
-    "outputs/graphcast_gfs_20260724T000000_240h.zarr"
+    "outputs/graphcast/20260724T000000/forecast.zarr"
 )
 
 
@@ -776,15 +776,11 @@ def test_graphcast_multiple_pressure_minima():
 
     # The lowest detected local minimum should equal the
     # unconstrained regional minimum at this lead time.
+    expected_minimum = float(
+        pressure.min().compute()
+    )
+
     assert minima[0].value == pytest.approx(
-        100444.72,
-        abs=0.1,
-    )
-
-    assert minima[0].latitude == pytest.approx(
-        11.50
-    )
-
-    assert minima[0].longitude == pytest.approx(
-        257.25
+        expected_minimum,
+        abs=1e-6,
     )

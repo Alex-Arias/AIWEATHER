@@ -698,19 +698,112 @@ class Forecast:
         )
 
 
-
-
-
-
 def _metadata_from_path(
     path: str | Path,
     dataset: xr.Dataset,
 ) -> ForecastMetadata:
     """
-    Build ForecastMetadata from the standardized AIWeather output path.
+    Build ForecastMetadata from an AIWeather forecast.
+
+    Supports both the canonical runner-managed layout
+
+        outputs/<model>/<YYYYMMDDTHHMMSS>/forecast.zarr
+
+    and the legacy filename layout
+
+        <model>_<datasource>_<YYYYMMDDTHHMMSS>_<hours>h.zarr
     """
 
     path = Path(path)
+
+    # ---------------------------------------------------------
+    # Canonical AIWeather output
+    # ---------------------------------------------------------
+
+    if path.name == "forecast.zarr":
+        attrs = dataset.attrs
+
+        model = attrs.get(
+            "aiweather_model"
+        )
+
+        forecast_id = attrs.get(
+            "aiweather_forecast_id"
+        )
+
+        init_value = attrs.get(
+            "aiweather_initialization_time"
+        )
+
+        backend = attrs.get(
+            "aiweather_backend",
+            "earth2studio",
+        )
+
+        # Older canonical stores may predate persistent attrs.
+        if model is None:
+            model = path.parent.parent.name
+
+        if init_value is None:
+            init_string = path.parent.name
+
+            try:
+                initialization_time = datetime.strptime(
+                    init_string,
+                    "%Y%m%dT%H%M%S",
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    "Could not determine forecast initialization "
+                    f"time from canonical path: {path}"
+                ) from exc
+
+        else:
+            initialization_time = datetime.fromisoformat(
+                str(init_value)
+            )
+
+        if forecast_id is None:
+            # Backward-compatible fallback for canonical stores
+            # written before AIWeather metadata persistence.
+            lead_hours = (
+                dataset["lead_time"]
+                .values
+                .astype("timedelta64[h]")
+                .astype(int)
+            )
+
+            maximum_lead = int(
+                lead_hours.max()
+            )
+
+            datasource = attrs.get(
+                "aiweather_datasource",
+                "unknown",
+            )
+
+            init_string = initialization_time.strftime(
+                "%Y%m%dT%H%M%S"
+            )
+
+            forecast_id = (
+                f"{model}_{datasource}_"
+                f"{init_string}_{maximum_lead}h"
+            )
+
+        return ForecastMetadata(
+            model_name=str(model),
+            model_version="unknown",
+            backend=str(backend),
+            forecast_id=str(forecast_id),
+            initialization_time=initialization_time,
+            creation_time=None,
+        )
+
+    # ---------------------------------------------------------
+    # Legacy AIWeather output
+    # ---------------------------------------------------------
+
     name = path.name
 
     pattern = re.compile(
@@ -718,30 +811,30 @@ def _metadata_from_path(
         r"(?P<init>\d{8}T\d{6})_(?P<hours>\d+)h\.zarr$"
     )
 
-    match = pattern.match(name)
+    match = pattern.match(
+        name
+    )
 
     if match is None:
         raise ValueError(
-            "Forecast path does not match the expected AIWeather "
-            "output format: "
-            "<model>_<datasource>_<YYYYMMDDTHHMMSS>_<hours>h.zarr"
+            "Forecast path does not match a supported AIWeather "
+            "output format."
         )
 
-    model = match.group("model")
-    init_string = match.group("init")
-
-    initialization_time = datetime.strptime(
-        init_string,
-        "%Y%m%dT%H%M%S",
+    model = match.group(
+        "model"
     )
 
-    forecast_id = path.stem
+    initialization_time = datetime.strptime(
+        match.group("init"),
+        "%Y%m%dT%H%M%S",
+    )
 
     return ForecastMetadata(
         model_name=model,
         model_version="unknown",
         backend="earth2studio",
-        forecast_id=forecast_id,
+        forecast_id=path.stem,
         initialization_time=initialization_time,
         creation_time=None,
     )
@@ -750,7 +843,7 @@ def _metadata_from_path(
 def open_forecast(
     path: str | Path,
     *,
-    consolidated: bool = True,
+    consolidated: bool | None = None,
 ) -> Forecast:
     """
     Open an AIWeather forecast stored in Zarr format.
@@ -760,8 +853,10 @@ def open_forecast(
     path : str or pathlib.Path
         Path to the forecast Zarr store.
 
-    consolidated : bool, default=True
-        Whether to read consolidated Zarr metadata.
+    consolidated : bool or None, default=None
+        Whether to require consolidated Zarr metadata. When None,
+        xarray automatically handles stores with or without
+        consolidated metadata.
 
     Returns
     -------
