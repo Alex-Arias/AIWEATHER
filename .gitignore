@@ -157,3 +157,11 @@ TestGCast2/logs/
 TestGCast2/outputs/
 TestGCast2/__pycache__/
 ```
+
+
+# -----------------------------------------------------------------------------
+# External verification datasets
+# -----------------------------------------------------------------------------
+
+# IBTrACS files are downloaded from NOAA and are not stored in Git
+data/verification/ibtracs/*.csv
