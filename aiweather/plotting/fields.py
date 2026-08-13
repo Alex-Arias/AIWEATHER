@@ -170,6 +170,82 @@ def _normalize_longitude(
     return normalized
 
 
+def storm_centered_extent(
+    latitude: float,
+    longitude: float,
+    *,
+    latitude_margin: float = 8.0,
+    longitude_margin: float = 12.0,
+) -> tuple[
+    float,
+    float,
+    float,
+    float,
+]:
+    """
+    Build a plotting extent around a tropical cyclone center.
+
+    Parameters
+    ----------
+    latitude
+        Storm-center latitude.
+
+    longitude
+        Storm-center longitude.
+
+    latitude_margin
+        Latitude padding in degrees.
+
+    longitude_margin
+        Longitude padding in degrees.
+
+    Returns
+    -------
+    tuple
+        ``(lon_min, lon_max, lat_min, lat_max)``.
+    """
+    latitude = float(
+        latitude
+    )
+
+    longitude = float(
+        _normalize_longitude(
+            longitude
+        )
+    )
+
+    if not np.isfinite(
+        latitude
+    ):
+        raise ValueError(
+            "latitude must be finite."
+        )
+
+    if not np.isfinite(
+        longitude
+    ):
+        raise ValueError(
+            "longitude must be finite."
+        )
+
+    if latitude_margin <= 0.0:
+        raise ValueError(
+            "latitude_margin must be positive."
+        )
+
+    if longitude_margin <= 0.0:
+        raise ValueError(
+            "longitude_margin must be positive."
+        )
+
+    return (
+        longitude - longitude_margin,
+        longitude + longitude_margin,
+        latitude - latitude_margin,
+        latitude + latitude_margin,
+    )
+
+
 def plot_tc_field(
     dataset: xr.Dataset,
     *,
@@ -632,7 +708,9 @@ def plot_tc_field(
     )
 
     if centers:
-        ax.legend()
+        ax.legend(
+            loc="upper right",
+        )
 
     return (
         figure,

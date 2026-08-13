@@ -286,3 +286,56 @@ def test_plot_tc_field_invalid_center_value():
                 "Native": 10.0,
             },
         )
+
+def test_storm_centered_extent():
+    from aiweather.plotting.fields import (
+        storm_centered_extent,
+    )
+
+    extent = storm_centered_extent(
+        15.0,
+        250.0,
+        latitude_margin=5.0,
+        longitude_margin=10.0,
+    )
+
+    assert extent == pytest.approx(
+        (
+            -120.0,
+            -100.0,
+            10.0,
+            20.0,
+        )
+    )
+
+
+def test_storm_centered_extent_invalid_latitude_margin():
+    from aiweather.plotting.fields import (
+        storm_centered_extent,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="latitude_margin",
+    ):
+        storm_centered_extent(
+            15.0,
+            250.0,
+            latitude_margin=0.0,
+        )
+
+
+def test_storm_centered_extent_invalid_longitude_margin():
+    from aiweather.plotting.fields import (
+        storm_centered_extent,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="longitude_margin",
+    ):
+        storm_centered_extent(
+            15.0,
+            250.0,
+            longitude_margin=0.0,
+        )
