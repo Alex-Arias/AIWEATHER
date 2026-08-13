@@ -21,6 +21,9 @@ from .workflow import (
     verify_tracking_workflow,
 )
 
+from .export import (
+    export_verification_case,
+)
 
 __all__ = [
     "BestTrackPoint",
@@ -34,4 +37,5 @@ __all__ = [
     "common_overlap_verifications",
     "VerificationWorkflowResult",
     "verify_tracking_workflow",
+    "export_verification_case",
 ]
