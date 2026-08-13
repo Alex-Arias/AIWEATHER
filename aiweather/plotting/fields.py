@@ -16,6 +16,8 @@ import numpy as np
 import xarray as xr
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
 
 
 def wind_speed(
@@ -170,6 +172,46 @@ def _normalize_longitude(
     return normalized
 
 
+def _prepare_fields(
+    dataset: xr.Dataset,
+    lead_time_hours: int | float,
+) -> tuple[
+    xr.DataArray,
+    xr.DataArray,
+    xr.DataArray,
+]:
+    """
+    Select and align U10, V10, and MSLP fields.
+    """
+    u_wind = _squeeze_field(
+        _select_lead_time(
+            dataset["u10m"],
+            lead_time_hours,
+        )
+    )
+
+    v_wind = _squeeze_field(
+        _select_lead_time(
+            dataset["v10m"],
+            lead_time_hours,
+        )
+    )
+
+    pressure = _squeeze_field(
+        _select_lead_time(
+            dataset["msl"],
+            lead_time_hours,
+        )
+    )
+
+    return xr.align(
+        u_wind,
+        v_wind,
+        pressure,
+        join="exact",
+    )
+
+
 def storm_centered_extent(
     latitude: float,
     longitude: float,
@@ -184,25 +226,6 @@ def storm_centered_extent(
 ]:
     """
     Build a plotting extent around a tropical cyclone center.
-
-    Parameters
-    ----------
-    latitude
-        Storm-center latitude.
-
-    longitude
-        Storm-center longitude.
-
-    latitude_margin
-        Latitude padding in degrees.
-
-    longitude_margin
-        Longitude padding in degrees.
-
-    Returns
-    -------
-    tuple
-        ``(lon_min, lon_max, lat_min, lat_max)``.
     """
     latitude = float(
         latitude
@@ -262,6 +285,11 @@ def plot_tc_field(
         tuple[float, float],
     ] | None = None,
     title: str | None = None,
+    add_colorbar: bool = True,
+    wind_speed_limits: tuple[
+        float,
+        float,
+    ] | None = None,
 ) -> tuple[
     Figure,
     Axes,
@@ -269,53 +297,8 @@ def plot_tc_field(
     """
     Plot a tropical-cyclone meteorological field.
 
-    The map contains:
-
-    * 10-m wind-speed shading;
-    * 10-m horizontal wind vectors;
-    * mean sea-level pressure contours;
-    * optional tropical-cyclone center overlays.
-
-    Parameters
-    ----------
-    dataset
-        Forecast dataset containing ``u10m``, ``v10m``,
-        and ``msl``.
-
-    lead_time_hours
-        Forecast lead time in hours.
-
-    ax
-        Optional Matplotlib or Cartopy axes.
-
-    lat_min, lat_max, lon_min, lon_max
-        Optional map bounds.
-
-    quiver_stride
-        Grid-point stride used for wind vectors.
-
-    pressure_interval_hpa
-        MSLP contour interval in hPa.
-
-    centers
-        Optional mapping from center name to
-        ``(latitude, longitude)``.
-
-        Example::
-
-            {
-                "Native": (13.0, 254.0),
-                "WuDuan": (12.9, 253.9),
-                "IBTrACS": (12.6, -107.6),
-            }
-
-    title
-        Optional figure title.
-
-    Returns
-    -------
-    figure, axes
-        Matplotlib figure and axes.
+    The map contains 10-m wind-speed shading, wind vectors,
+    MSLP contours, and optional tropical-cyclone centers.
     """
     if not isinstance(
         dataset,
@@ -350,6 +333,59 @@ def plot_tc_field(
         raise ValueError(
             "pressure_interval_hpa must be positive."
         )
+
+    if not isinstance(
+        add_colorbar,
+        bool,
+    ):
+        raise TypeError(
+            "add_colorbar must be a boolean."
+        )
+
+    if wind_speed_limits is not None:
+        if (
+            not isinstance(
+                wind_speed_limits,
+                tuple,
+            )
+            or len(
+                wind_speed_limits
+            ) != 2
+        ):
+            raise TypeError(
+                "wind_speed_limits must be a "
+                "(minimum, maximum) tuple."
+            )
+
+        wind_min = float(
+            wind_speed_limits[0]
+        )
+
+        wind_max = float(
+            wind_speed_limits[1]
+        )
+
+        if (
+            not np.isfinite(wind_min)
+            or not np.isfinite(wind_max)
+        ):
+            raise ValueError(
+                "wind_speed_limits must be finite."
+            )
+
+        if wind_min < 0.0:
+            raise ValueError(
+                "wind-speed minimum cannot be negative."
+            )
+
+        if wind_max <= wind_min:
+            raise ValueError(
+                "wind-speed maximum must be "
+                "greater than minimum."
+            )
+    else:
+        wind_min = None
+        wind_max = None
 
     if centers is None:
         centers = {}
@@ -405,32 +441,13 @@ def plot_tc_field(
                 "center longitude must be finite."
             )
 
-    u_wind = _squeeze_field(
-        _select_lead_time(
-            dataset["u10m"],
-            lead_time_hours,
-        )
-    )
-
-    v_wind = _squeeze_field(
-        _select_lead_time(
-            dataset["v10m"],
-            lead_time_hours,
-        )
-    )
-
-    pressure = _squeeze_field(
-        _select_lead_time(
-            dataset["msl"],
-            lead_time_hours,
-        )
-    )
-
-    u_wind, v_wind, pressure = xr.align(
+    (
         u_wind,
         v_wind,
         pressure,
-        join="exact",
+    ) = _prepare_fields(
+        dataset,
+        lead_time_hours,
     )
 
     speed = wind_speed(
@@ -508,18 +525,21 @@ def plot_tc_field(
         latitude,
         speed,
         shading="auto",
+        vmin=wind_min,
+        vmax=wind_max,
         **plot_kwargs,
     )
 
-    colorbar = figure.colorbar(
-        shading,
-        ax=ax,
-        pad=0.03,
-    )
+    if add_colorbar:
+        colorbar = figure.colorbar(
+            shading,
+            ax=ax,
+            pad=0.03,
+        )
 
-    colorbar.set_label(
-        "10-m wind speed [m/s]"
-    )
+        colorbar.set_label(
+            "10-m wind speed [m/s]"
+        )
 
     pressure_hpa = (
         pressure / 100.0
@@ -597,10 +617,6 @@ def plot_tc_field(
         ],
         **plot_kwargs,
     )
-
-    # ---------------------------------------------------------
-    # Tropical cyclone centers
-    # ---------------------------------------------------------
 
     for (
         name,
@@ -752,59 +768,8 @@ def plot_tc_field_sequence(
     """
     Plot a sequence of tropical-cyclone field maps.
 
-    Each panel contains 10-m wind speed, wind vectors,
-    mean sea-level pressure contours, and optional storm centers.
-
-    Parameters
-    ----------
-    dataset
-        Forecast dataset.
-
-    lead_times
-        Forecast lead times to plot.
-
-    centers_by_lead
-        Mapping from lead time to center mappings.
-
-        Example::
-
-            {
-                54: {
-                    "Native": (13.0, 254.0),
-                    "IBTrACS": (12.6, -107.6),
-                },
-                78: {
-                    "Native": (15.25, 250.5),
-                    "IBTrACS": (15.1, -111.7),
-                },
-            }
-
-    reference_centers
-        Mapping from lead time to the center used for
-        storm-centered map bounds.
-
-    latitude_margin
-        Latitude margin around each reference center.
-
-    longitude_margin
-        Longitude margin around each reference center.
-
-    quiver_stride
-        Wind-vector subsampling interval.
-
-    pressure_interval_hpa
-        MSLP contour interval.
-
-    ncols
-        Number of subplot columns.
-
-    figsize
-        Figure size.
-
-    Returns
-    -------
-    figure, axes
-        Figure and array of Cartopy axes.
+    All panels use one common 10-m wind-speed scale and a
+    single shared colorbar.
     """
     if not isinstance(
         dataset,
@@ -864,6 +829,53 @@ def plot_tc_field_sequence(
             "Cartopy is required for "
             "plot_tc_field_sequence."
         ) from exc
+
+    # ---------------------------------------------------------
+    # Shared wind-speed scale
+    # ---------------------------------------------------------
+
+    sequence_maximum = 0.0
+
+    for lead in lead_times:
+        (
+            u_wind,
+            v_wind,
+            _,
+        ) = _prepare_fields(
+            dataset,
+            lead,
+        )
+
+        speed = wind_speed(
+            u_wind,
+            v_wind,
+        )
+
+        maximum = float(
+            np.nanmax(
+                np.asarray(
+                    speed
+                )
+            )
+        )
+
+        sequence_maximum = max(
+            sequence_maximum,
+            maximum,
+        )
+
+    if (
+        not np.isfinite(
+            sequence_maximum
+        )
+        or sequence_maximum <= 0.0
+    ):
+        sequence_maximum = 1.0
+
+    shared_limits = (
+        0.0,
+        sequence_maximum,
+    )
 
     count = len(
         lead_times
@@ -968,6 +980,10 @@ def plot_tc_field_sequence(
             title=(
                 f"+{lead:g} h"
             ),
+            add_colorbar=False,
+            wind_speed_limits=(
+                shared_limits
+            ),
         )
 
         ax.text(
@@ -995,7 +1011,49 @@ def plot_tc_field_sequence(
             False
         )
 
-    figure.tight_layout()
+    # ---------------------------------------------------------
+    # Shared colorbar
+    # ---------------------------------------------------------
+
+    scalar_mappable = ScalarMappable(
+        norm=Normalize(
+            vmin=shared_limits[0],
+            vmax=shared_limits[1],
+        ),
+    )
+
+    scalar_mappable.set_array(
+        []
+    )
+
+    visible_axes = [
+        flat_axes[index]
+        for index in range(
+            count
+        )
+    ]
+
+    colorbar = figure.colorbar(
+        scalar_mappable,
+        ax=visible_axes,
+        orientation="horizontal",
+        fraction=0.04,
+        pad=0.06,
+        aspect=35,
+    )
+
+    colorbar.set_label(
+        "10-m wind speed [m/s]"
+    )
+
+    figure.subplots_adjust(
+       left=0.06,
+        right=0.96,
+        top=0.94,
+        bottom=0.12,
+        wspace=0.08,
+        hspace=0.12,
+    )
 
     return (
         figure,

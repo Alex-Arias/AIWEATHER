@@ -508,3 +508,158 @@ def test_plot_tc_field_sequence_invalid_reference_mapping():
             ],
             reference_centers=[],
         )
+
+def test_plot_tc_field_without_colorbar():
+    dataset = make_dataset()
+
+    figure, ax = plot_tc_field(
+        dataset,
+        lead_time_hours=6,
+        add_colorbar=False,
+    )
+
+    # Only the main plotting axes should exist.
+    assert len(
+        figure.axes
+    ) == 1
+
+    figure.canvas.draw()
+
+    plt.close(
+        figure
+    )
+
+
+def test_plot_tc_field_with_wind_speed_limits():
+    dataset = make_dataset()
+
+    figure, ax = plot_tc_field(
+        dataset,
+        lead_time_hours=6,
+        wind_speed_limits=(
+            0.0,
+            10.0,
+        ),
+    )
+
+    # pcolormesh is the first collection.
+    shading = ax.collections[
+        0
+    ]
+
+    assert shading.norm.vmin == pytest.approx(
+        0.0
+    )
+
+    assert shading.norm.vmax == pytest.approx(
+        10.0
+    )
+
+    figure.canvas.draw()
+
+    plt.close(
+        figure
+    )
+
+
+def test_plot_tc_field_invalid_wind_limits_type():
+    dataset = make_dataset()
+
+    with pytest.raises(
+        TypeError,
+        match="wind_speed_limits",
+    ):
+        plot_tc_field(
+            dataset,
+            lead_time_hours=6,
+            wind_speed_limits=[
+                0.0,
+                10.0,
+            ],
+        )
+
+
+def test_plot_tc_field_invalid_wind_limits_order():
+    dataset = make_dataset()
+
+    with pytest.raises(
+        ValueError,
+        match="greater than minimum",
+    ):
+        plot_tc_field(
+            dataset,
+            lead_time_hours=6,
+            wind_speed_limits=(
+                10.0,
+                5.0,
+            ),
+        )
+
+
+def test_plot_tc_field_invalid_add_colorbar():
+    dataset = make_dataset()
+
+    with pytest.raises(
+        TypeError,
+        match="boolean",
+    ):
+        plot_tc_field(
+            dataset,
+            lead_time_hours=6,
+            add_colorbar="yes",
+        )
+
+
+def test_plot_tc_field_sequence_shared_colorbar():
+    dataset = make_dataset()
+
+    figure, axes = plot_tc_field_sequence(
+        dataset,
+        lead_times=[
+            0,
+            6,
+            12,
+            6,
+        ],
+        ncols=2,
+        quiver_stride=1,
+        pressure_interval_hpa=2.0,
+    )
+
+    # Four panel axes plus exactly one shared
+    # colorbar axes.
+    assert len(
+        figure.axes
+    ) == 5
+
+    panel_norms = []
+
+    for ax in axes.ravel():
+        shading = ax.collections[
+            0
+        ]
+
+        panel_norms.append(
+            (
+                shading.norm.vmin,
+                shading.norm.vmax,
+            )
+        )
+
+    assert all(
+        limits
+        == panel_norms[0]
+        for limits in panel_norms
+    )
+
+    assert panel_norms[
+        0
+    ][0] == pytest.approx(
+        0.0
+    )
+
+    figure.canvas.draw()
+
+    plt.close(
+        figure
+    )
