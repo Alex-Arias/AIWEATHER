@@ -2,8 +2,8 @@
 Meteorological field plotting utilities.
 
 Provides tropical-cyclone field maps using 10-m wind speed,
-10-m wind vectors, mean sea-level pressure, and optional
-storm-center overlays.
+10-m wind vectors, mean sea-level pressure, optional
+storm-center overlays, and multi-panel field sequences.
 """
 
 from __future__ import annotations
@@ -715,4 +715,289 @@ def plot_tc_field(
     return (
         figure,
         ax,
+    )
+
+
+def plot_tc_field_sequence(
+    dataset: xr.Dataset,
+    *,
+    lead_times: list[int | float],
+    centers_by_lead: Mapping[
+        int | float,
+        Mapping[
+            str,
+            tuple[float, float],
+        ],
+    ] | None = None,
+    reference_centers: Mapping[
+        int | float,
+        tuple[float, float],
+    ] | None = None,
+    latitude_margin: float = 8.0,
+    longitude_margin: float = 12.0,
+    quiver_stride: int = 16,
+    pressure_interval_hpa: float = 4.0,
+    ncols: int = 2,
+    figsize: tuple[
+        float,
+        float,
+    ] = (
+        14.0,
+        10.0,
+    ),
+) -> tuple[
+    Figure,
+    np.ndarray,
+]:
+    """
+    Plot a sequence of tropical-cyclone field maps.
+
+    Each panel contains 10-m wind speed, wind vectors,
+    mean sea-level pressure contours, and optional storm centers.
+
+    Parameters
+    ----------
+    dataset
+        Forecast dataset.
+
+    lead_times
+        Forecast lead times to plot.
+
+    centers_by_lead
+        Mapping from lead time to center mappings.
+
+        Example::
+
+            {
+                54: {
+                    "Native": (13.0, 254.0),
+                    "IBTrACS": (12.6, -107.6),
+                },
+                78: {
+                    "Native": (15.25, 250.5),
+                    "IBTrACS": (15.1, -111.7),
+                },
+            }
+
+    reference_centers
+        Mapping from lead time to the center used for
+        storm-centered map bounds.
+
+    latitude_margin
+        Latitude margin around each reference center.
+
+    longitude_margin
+        Longitude margin around each reference center.
+
+    quiver_stride
+        Wind-vector subsampling interval.
+
+    pressure_interval_hpa
+        MSLP contour interval.
+
+    ncols
+        Number of subplot columns.
+
+    figsize
+        Figure size.
+
+    Returns
+    -------
+    figure, axes
+        Figure and array of Cartopy axes.
+    """
+    if not isinstance(
+        dataset,
+        xr.Dataset,
+    ):
+        raise TypeError(
+            "dataset must be an xarray Dataset."
+        )
+
+    if not isinstance(
+        lead_times,
+        list,
+    ):
+        raise TypeError(
+            "lead_times must be a list."
+        )
+
+    if not lead_times:
+        raise ValueError(
+            "lead_times cannot be empty."
+        )
+
+    if ncols < 1:
+        raise ValueError(
+            "ncols must be at least 1."
+        )
+
+    if centers_by_lead is None:
+        centers_by_lead = {}
+
+    if reference_centers is None:
+        reference_centers = {}
+
+    if not isinstance(
+        centers_by_lead,
+        Mapping,
+    ):
+        raise TypeError(
+            "centers_by_lead must be a mapping."
+        )
+
+    if not isinstance(
+        reference_centers,
+        Mapping,
+    ):
+        raise TypeError(
+            "reference_centers must be a mapping."
+        )
+
+    try:
+        import cartopy.crs as ccrs
+
+        projection = ccrs.PlateCarree()
+
+    except ImportError as exc:
+        raise ImportError(
+            "Cartopy is required for "
+            "plot_tc_field_sequence."
+        ) from exc
+
+    count = len(
+        lead_times
+    )
+
+    nrows = int(
+        np.ceil(
+            count / ncols
+        )
+    )
+
+    figure, axes = plt.subplots(
+        nrows=nrows,
+        ncols=ncols,
+        figsize=figsize,
+        subplot_kw={
+            "projection": projection,
+        },
+        squeeze=False,
+    )
+
+    flat_axes = axes.ravel()
+
+    for index, lead in enumerate(
+        lead_times
+    ):
+        ax = flat_axes[
+            index
+        ]
+
+        centers = dict(
+            centers_by_lead.get(
+                lead,
+                {},
+            )
+        )
+
+        reference_center = (
+            reference_centers.get(
+                lead
+            )
+        )
+
+        if (
+            reference_center is None
+            and "IBTrACS" in centers
+        ):
+            reference_center = (
+                centers["IBTrACS"]
+            )
+
+        if (
+            reference_center is None
+            and "Native" in centers
+        ):
+            reference_center = (
+                centers["Native"]
+            )
+
+        extent = None
+
+        if reference_center is not None:
+            extent = (
+                storm_centered_extent(
+                    reference_center[0],
+                    reference_center[1],
+                    latitude_margin=(
+                        latitude_margin
+                    ),
+                    longitude_margin=(
+                        longitude_margin
+                    ),
+                )
+            )
+
+        if extent is None:
+            lon_min = None
+            lon_max = None
+            lat_min = None
+            lat_max = None
+        else:
+            (
+                lon_min,
+                lon_max,
+                lat_min,
+                lat_max,
+            ) = extent
+
+        plot_tc_field(
+            dataset,
+            lead_time_hours=lead,
+            ax=ax,
+            lat_min=lat_min,
+            lat_max=lat_max,
+            lon_min=lon_min,
+            lon_max=lon_max,
+            quiver_stride=quiver_stride,
+            pressure_interval_hpa=(
+                pressure_interval_hpa
+            ),
+            centers=centers,
+            title=(
+                f"+{lead:g} h"
+            ),
+        )
+
+        ax.text(
+            0.02,
+            0.98,
+            chr(
+                ord("a")
+                + index
+            ),
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=12,
+            fontweight="bold",
+            zorder=20,
+        )
+
+    for index in range(
+        count,
+        len(flat_axes),
+    ):
+        flat_axes[
+            index
+        ].set_visible(
+            False
+        )
+
+    figure.tight_layout()
+
+    return (
+        figure,
+        axes,
     )

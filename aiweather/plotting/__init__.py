@@ -11,6 +11,7 @@ from .verification import (
 
 from .fields import (
     plot_tc_field,
+    plot_tc_field_sequence,
     storm_centered_extent,
     wind_speed,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "plot_track_error",
     "plot_wind_evolution",
     "plot_tc_field",
+    "plot_tc_field_sequence",
     "storm_centered_extent",
     "wind_speed",
 ]

@@ -9,6 +9,8 @@ import xarray as xr
 
 from aiweather.plotting.fields import (
     plot_tc_field,
+    plot_tc_field_sequence,
+    storm_centered_extent,
     wind_speed,
 )
 
@@ -338,4 +340,171 @@ def test_storm_centered_extent_invalid_longitude_margin():
             15.0,
             250.0,
             longitude_margin=0.0,
+        )
+
+def test_plot_tc_field_sequence():
+    dataset = make_dataset()
+
+    figure, axes = plot_tc_field_sequence(
+        dataset,
+        lead_times=[
+            0,
+            6,
+            12,
+            6,
+        ],
+        centers_by_lead={
+            0: {
+                "Native": (
+                    11.0,
+                    251.0,
+                ),
+                "IBTrACS": (
+                    10.5,
+                    -109.0,
+                ),
+            },
+            6: {
+                "Native": (
+                    11.5,
+                    251.5,
+                ),
+            },
+            12: {
+                "Native": (
+                    12.0,
+                    252.0,
+                ),
+            },
+        },
+        ncols=2,
+        quiver_stride=1,
+        pressure_interval_hpa=2.0,
+    )
+
+    assert axes.shape == (
+        2,
+        2,
+    )
+
+    titles = [
+        ax.get_title()
+        for ax in axes.ravel()
+    ]
+
+    assert titles == [
+        "+0 h",
+        "+6 h",
+        "+12 h",
+        "+6 h",
+    ]
+
+    figure.canvas.draw()
+
+    plt.close(
+        figure
+    )
+
+
+def test_plot_tc_field_sequence_hides_unused_axis():
+    dataset = make_dataset()
+
+    figure, axes = plot_tc_field_sequence(
+        dataset,
+        lead_times=[
+            0,
+            6,
+            12,
+        ],
+        ncols=2,
+    )
+
+    assert axes.shape == (
+        2,
+        2,
+    )
+
+    assert (
+        axes.ravel()[-1].get_visible()
+        is False
+    )
+
+    figure.canvas.draw()
+
+    plt.close(
+        figure
+    )
+
+
+def test_plot_tc_field_sequence_empty_leads():
+    dataset = make_dataset()
+
+    with pytest.raises(
+        ValueError,
+        match="cannot be empty",
+    ):
+        plot_tc_field_sequence(
+            dataset,
+            lead_times=[],
+        )
+
+
+def test_plot_tc_field_sequence_invalid_leads():
+    dataset = make_dataset()
+
+    with pytest.raises(
+        TypeError,
+        match="lead_times",
+    ):
+        plot_tc_field_sequence(
+            dataset,
+            lead_times=(0, 6),
+        )
+
+
+def test_plot_tc_field_sequence_invalid_ncols():
+    dataset = make_dataset()
+
+    with pytest.raises(
+        ValueError,
+        match="at least 1",
+    ):
+        plot_tc_field_sequence(
+            dataset,
+            lead_times=[
+                0,
+            ],
+            ncols=0,
+        )
+
+
+def test_plot_tc_field_sequence_invalid_centers_mapping():
+    dataset = make_dataset()
+
+    with pytest.raises(
+        TypeError,
+        match="centers_by_lead",
+    ):
+        plot_tc_field_sequence(
+            dataset,
+            lead_times=[
+                0,
+            ],
+            centers_by_lead=[],
+        )
+
+
+def test_plot_tc_field_sequence_invalid_reference_mapping():
+    dataset = make_dataset()
+
+    with pytest.raises(
+        TypeError,
+        match="reference_centers",
+    ):
+        plot_tc_field_sequence(
+            dataset,
+            lead_times=[
+                0,
+            ],
+            reference_centers=[],
         )
