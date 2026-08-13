@@ -262,3 +262,193 @@ def test_align_by_valid_time_invalid_observations():
             [],
             "invalid",
         )
+
+def test_common_overlap_verifications():
+    from aiweather.verification.comparison import (
+        common_overlap_verifications,
+    )
+
+    native = compare_forecast_to_best_track(
+        [
+            make_record(
+                "2026-07-24T00:00:00",
+                0,
+                10.0,
+                250.0,
+            ),
+            make_record(
+                "2026-07-24T06:00:00",
+                6,
+                11.0,
+                249.0,
+            ),
+            make_record(
+                "2026-07-24T12:00:00",
+                12,
+                12.0,
+                248.0,
+            ),
+        ],
+        [
+            make_record(
+                "2026-07-24T00:00:00",
+                0,
+                10.0,
+                250.0,
+            ),
+            make_record(
+                "2026-07-24T06:00:00",
+                6,
+                11.0,
+                249.0,
+            ),
+            make_record(
+                "2026-07-24T12:00:00",
+                12,
+                12.0,
+                248.0,
+            ),
+        ],
+        forecast_name="native",
+    )
+
+    wuduan = compare_forecast_to_best_track(
+        [
+            make_record(
+                "2026-07-24T06:00:00",
+                6,
+                11.0,
+                249.0,
+            ),
+            make_record(
+                "2026-07-24T12:00:00",
+                12,
+                12.0,
+                248.0,
+            ),
+            make_record(
+                "2026-07-24T18:00:00",
+                18,
+                13.0,
+                247.0,
+            ),
+        ],
+        [
+            make_record(
+                "2026-07-24T06:00:00",
+                6,
+                11.0,
+                249.0,
+            ),
+            make_record(
+                "2026-07-24T12:00:00",
+                12,
+                12.0,
+                248.0,
+            ),
+            make_record(
+                "2026-07-24T18:00:00",
+                18,
+                13.0,
+                247.0,
+            ),
+        ],
+        forecast_name="wuduan",
+    )
+
+    vitart = compare_forecast_to_best_track(
+        [
+            make_record(
+                "2026-07-24T12:00:00",
+                12,
+                12.0,
+                248.0,
+            ),
+            make_record(
+                "2026-07-24T18:00:00",
+                18,
+                13.0,
+                247.0,
+            ),
+        ],
+        [
+            make_record(
+                "2026-07-24T12:00:00",
+                12,
+                12.0,
+                248.0,
+            ),
+            make_record(
+                "2026-07-24T18:00:00",
+                18,
+                13.0,
+                247.0,
+            ),
+        ],
+        forecast_name="vitart",
+    )
+
+    result = common_overlap_verifications(
+        {
+            "native": native,
+            "wuduan": wuduan,
+            "vitart": vitart,
+        }
+    )
+
+    assert set(result) == {
+        "native",
+        "wuduan",
+        "vitart",
+    }
+
+    for verification in result.values():
+        assert verification.overlap_count == 1
+
+        assert list(
+            verification.table[
+                "lead_time_hours"
+            ]
+        ) == [12]
+
+
+def test_common_overlap_verifications_empty():
+    from aiweather.verification.comparison import (
+        common_overlap_verifications,
+    )
+
+    result = common_overlap_verifications(
+        {}
+    )
+
+    assert result == {}
+
+
+def test_common_overlap_verifications_invalid_type():
+    from aiweather.verification.comparison import (
+        common_overlap_verifications,
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="dictionary",
+    ):
+        common_overlap_verifications(
+            []
+        )
+
+
+def test_common_overlap_verifications_invalid_contents():
+    from aiweather.verification.comparison import (
+        common_overlap_verifications,
+    )
+
+    with pytest.raises(
+        TypeError,
+        match="TrackVerification",
+    ):
+        common_overlap_verifications(
+            {
+                "native": object(),
+            }
+        )

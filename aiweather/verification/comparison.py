@@ -407,3 +407,99 @@ def compare_forecast_to_best_track(
         observation_name=observation_name,
         table=table,
     )
+
+def common_overlap_verifications(
+    verifications: dict[str, TrackVerification],
+) -> dict[str, TrackVerification]:
+    """
+    Restrict multiple verification results to common valid times.
+
+    All returned verification tables contain exactly the same valid
+    times, allowing fair comparison of forecast systems or trackers
+    with different temporal coverage.
+
+    Parameters
+    ----------
+    verifications
+        Mapping from tracker or forecast name to TrackVerification.
+
+    Returns
+    -------
+    dict of str to TrackVerification
+        New verification results restricted to valid times shared by
+        every input verification.
+
+    Raises
+    ------
+    TypeError
+        If verifications is not a dictionary or contains objects that
+        are not TrackVerification instances.
+    """
+
+    if not isinstance(
+        verifications,
+        dict,
+    ):
+        raise TypeError(
+            "verifications must be a dictionary."
+        )
+
+    if not verifications:
+        return {}
+
+    for verification in verifications.values():
+        if not isinstance(
+            verification,
+            TrackVerification,
+        ):
+            raise TypeError(
+                "verifications must contain "
+                "TrackVerification objects."
+            )
+
+    common_times = None
+
+    for verification in verifications.values():
+        times = set(
+            verification.table[
+                "valid_time"
+            ].tolist()
+        )
+
+        if common_times is None:
+            common_times = times
+        else:
+            common_times &= times
+
+    if common_times is None:
+        common_times = set()
+
+    result = {}
+
+    for name, verification in verifications.items():
+        table = (
+            verification.table[
+                verification.table[
+                    "valid_time"
+                ].isin(common_times)
+            ]
+            .copy()
+            .sort_values(
+                "valid_time"
+            )
+            .reset_index(
+                drop=True
+            )
+        )
+
+        result[name] = TrackVerification(
+            forecast_name=(
+                verification.forecast_name
+            ),
+            observation_name=(
+                verification.observation_name
+            ),
+            table=table,
+        )
+
+    return result
