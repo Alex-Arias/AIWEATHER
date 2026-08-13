@@ -9,10 +9,17 @@ from .verification import (
     plot_wind_evolution,
 )
 
+from .fields import (
+    plot_tc_field,
+    wind_speed,
+)
+
 __all__ = [
     "normalize_longitude",
     "plot_track_map",
     "plot_pressure_evolution",
     "plot_track_error",
     "plot_wind_evolution",
+    "plot_tc_field",
+    "wind_speed",
 ]
