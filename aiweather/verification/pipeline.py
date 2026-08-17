@@ -12,6 +12,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from aiweather.data import (
+    ensure_ibtracs_dataset,
+)
 from aiweather.forecast import open_forecast
 from aiweather.plotting import (
     plot_pressure_evolution,
@@ -512,12 +515,12 @@ def _generate_field_sequence_plot(
 def run_tc_verification_pipeline(
     forecast_path: str | Path,
     *,
-    ibtracs_path: str | Path,
     sid: str,
     lat_min: float,
     lat_max: float,
     lon_min: float,
     lon_max: float,
+    ibtracs_path: str | Path | None = None,
     device: str = "cpu",
     minimum_overlap: int = 1,
     output_dir: str | Path | None = None,
@@ -526,6 +529,12 @@ def run_tc_verification_pipeline(
     field_lead_times: list[
         int | float
     ] | None = None,
+    ibtracs_basin: str = "EP",
+    ibtracs_cache_dir: str | Path = (
+        "data/verification/ibtracs"
+    ),
+    ibtracs_max_age_hours: float = 48.0,
+    ibtracs_force_update: bool = False,
 ) -> TCVerificationPipelineResult:
     """
     Run tropical cyclone tracking and best-track verification.
@@ -535,14 +544,20 @@ def run_tc_verification_pipeline(
     forecast_path
         Path to the AIWeather forecast store.
 
-    ibtracs_path
-        Path to an IBTrACS CSV file.
-
     sid
         IBTrACS storm identifier.
 
     lat_min, lat_max, lon_min, lon_max
         Tracking-domain bounds.
+
+    ibtracs_path
+        Optional explicit path to an IBTrACS CSV file.
+
+        When provided, this exact file is used and automatic
+        IBTrACS cache management is bypassed.
+
+        When None, the dataset is resolved automatically using
+        ``ensure_ibtracs_dataset``.
 
     device
         Device passed to the external tracker workflow.
@@ -577,6 +592,20 @@ def run_tc_verification_pipeline(
 
             [54, 78, 96, 120]
 
+    ibtracs_basin
+        IBTrACS basin used for automatic dataset resolution.
+
+    ibtracs_cache_dir
+        Directory used for the local IBTrACS cache.
+
+    ibtracs_max_age_hours
+        Maximum acceptable age of a cached IBTrACS dataset
+        before it is refreshed.
+
+    ibtracs_force_update
+        Force an IBTrACS download when automatic dataset
+        resolution is used, even when the cached file is fresh.
+
     Returns
     -------
     TCVerificationPipelineResult
@@ -599,6 +628,46 @@ def run_tc_verification_pipeline(
     if not sid.strip():
         raise ValueError(
             "sid cannot be empty."
+        )
+
+    if (
+        ibtracs_path is not None
+        and not isinstance(
+            ibtracs_path,
+            (str, Path),
+        )
+    ):
+        raise TypeError(
+            "ibtracs_path must be a string, "
+            "Path, or None."
+        )
+
+    if not isinstance(
+        ibtracs_basin,
+        str,
+    ):
+        raise TypeError(
+            "ibtracs_basin must be a string."
+        )
+
+    if not ibtracs_basin.strip():
+        raise ValueError(
+            "ibtracs_basin cannot be empty."
+        )
+
+    if not isinstance(
+        ibtracs_force_update,
+        bool,
+    ):
+        raise TypeError(
+            "ibtracs_force_update must be "
+            "a boolean."
+        )
+
+    if ibtracs_max_age_hours <= 0.0:
+        raise ValueError(
+            "ibtracs_max_age_hours must be "
+            "positive."
         )
 
     if not isinstance(
@@ -656,8 +725,32 @@ def run_tc_verification_pipeline(
         minimum_overlap=minimum_overlap,
     )
 
+    # ---------------------------------------------------------
+    # Resolve IBTrACS dataset
+    # ---------------------------------------------------------
+
+    if ibtracs_path is None:
+        resolved_ibtracs_path = (
+            ensure_ibtracs_dataset(
+                basin=ibtracs_basin,
+                cache_dir=(
+                    ibtracs_cache_dir
+                ),
+                max_age_hours=(
+                    ibtracs_max_age_hours
+                ),
+                force_update=(
+                    ibtracs_force_update
+                ),
+            )
+        )
+    else:
+        resolved_ibtracs_path = Path(
+            ibtracs_path
+        )
+
     best_track_points = read_ibtracs_csv(
-        ibtracs_path,
+        resolved_ibtracs_path,
         sid=sid,
     )
 

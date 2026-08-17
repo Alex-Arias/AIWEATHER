@@ -227,7 +227,7 @@ def test_run_tc_verification_pipeline(
 
     assert calls[2] == (
         "read_ibtracs",
-        "ibtracs.csv",
+        Path("ibtracs.csv"),
         "2026204N08267",
     )
 
@@ -819,4 +819,232 @@ def test_run_tc_verification_pipeline_negative_field_lead_time():
                 54,
                 -6,
             ],
+        )
+
+def test_pipeline_explicit_ibtracs_path_bypasses_cache(
+    monkeypatch,
+):
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            initialization_time=np.datetime64(
+                "2026-07-24T00:00:00"
+            )
+        )
+    )
+
+    tracking = make_tracking_result()
+    verification = make_verification_result()
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline.open_forecast",
+        lambda path: forecast,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "evaluate_forecast_trackers",
+        lambda *args, **kwargs: tracking,
+    )
+
+    def fail_ensure(*args, **kwargs):
+        raise AssertionError(
+            "cache manager should not be called"
+        )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "ensure_ibtracs_dataset",
+        fail_ensure,
+    )
+
+    captured = {}
+
+    def fake_read(
+        path,
+        *,
+        sid,
+    ):
+        captured["path"] = path
+        captured["sid"] = sid
+        return []
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "read_ibtracs_csv",
+        fake_read,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "best_track_to_records",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "verify_tracking_workflow",
+        lambda *args, **kwargs: verification,
+    )
+
+    run_tc_verification_pipeline(
+        "forecast.zarr",
+        sid="2026204N08267",
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        ibtracs_path="frozen.csv",
+    )
+
+    assert captured["path"] == Path(
+        "frozen.csv"
+    )
+
+    assert captured["sid"] == (
+        "2026204N08267"
+    )
+
+
+def test_pipeline_auto_ibtracs_resolution(
+    monkeypatch,
+    tmp_path,
+):
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            initialization_time=np.datetime64(
+                "2026-07-24T00:00:00"
+            )
+        )
+    )
+
+    tracking = make_tracking_result()
+    verification = make_verification_result()
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline.open_forecast",
+        lambda path: forecast,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "evaluate_forecast_trackers",
+        lambda *args, **kwargs: tracking,
+    )
+
+    resolved = (
+        tmp_path
+        / "ibtracs.EP.list.v04r01.csv"
+    )
+
+    calls = []
+
+    def fake_ensure(
+        *,
+        basin,
+        cache_dir,
+        max_age_hours,
+        force_update,
+    ):
+        calls.append(
+            {
+                "basin": basin,
+                "cache_dir": cache_dir,
+                "max_age_hours":
+                    max_age_hours,
+                "force_update":
+                    force_update,
+            }
+        )
+
+        return resolved
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "ensure_ibtracs_dataset",
+        fake_ensure,
+    )
+
+    captured = {}
+
+    def fake_read(
+        path,
+        *,
+        sid,
+    ):
+        captured["path"] = path
+        return []
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "read_ibtracs_csv",
+        fake_read,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "best_track_to_records",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "verify_tracking_workflow",
+        lambda *args, **kwargs: verification,
+    )
+
+    run_tc_verification_pipeline(
+        "forecast.zarr",
+        sid="2026204N08267",
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        ibtracs_path=None,
+        ibtracs_basin="EP",
+        ibtracs_cache_dir=tmp_path,
+        ibtracs_max_age_hours=72.0,
+        ibtracs_force_update=True,
+    )
+
+    assert calls == [
+        {
+            "basin": "EP",
+            "cache_dir": tmp_path,
+            "max_age_hours": 72.0,
+            "force_update": True,
+        }
+    ]
+
+    assert captured["path"] == resolved
+
+
+def test_pipeline_invalid_ibtracs_force_update():
+    with pytest.raises(
+        TypeError,
+        match="ibtracs_force_update",
+    ):
+        run_tc_verification_pipeline(
+            "forecast.zarr",
+            sid="2026204N08267",
+            lat_min=5.0,
+            lat_max=35.0,
+            lon_min=-130.0,
+            lon_max=-90.0,
+            ibtracs_force_update="yes",
+        )
+
+
+def test_pipeline_invalid_ibtracs_max_age():
+    with pytest.raises(
+        ValueError,
+        match="ibtracs_max_age_hours",
+    ):
+        run_tc_verification_pipeline(
+            "forecast.zarr",
+            sid="2026204N08267",
+            lat_min=5.0,
+            lat_max=35.0,
+            lon_min=-130.0,
+            lon_max=-90.0,
+            ibtracs_max_age_hours=0.0,
         )
