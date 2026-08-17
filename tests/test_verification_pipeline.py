@@ -586,3 +586,237 @@ def test_run_tc_verification_pipeline_invalid_generate_plots():
             lon_max=-90.0,
             generate_plots="yes",
         )
+
+def test_run_tc_verification_pipeline_generates_field_sequence(
+    monkeypatch,
+    tmp_path,
+):
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            initialization_time=np.datetime64(
+                "2026-07-24T00:00:00"
+            )
+        ),
+        dataset=object(),
+    )
+
+    tracking = make_tracking_result()
+    verification = make_verification_result()
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline.open_forecast",
+        lambda path: forecast,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "evaluate_forecast_trackers",
+        lambda *args, **kwargs: tracking,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "read_ibtracs_csv",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "best_track_to_records",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "verify_tracking_workflow",
+        lambda *args, **kwargs: verification,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "_generate_verification_plots",
+        lambda **kwargs: {},
+    )
+
+    calls = []
+
+    expected_path = (
+        tmp_path
+        / "plots"
+        / "field_sequence.png"
+    )
+
+    def fake_generate_field_sequence_plot(
+        *,
+        forecast,
+        tracking,
+        verification,
+        field_lead_times,
+        plot_output_dir,
+    ):
+        calls.append(
+            {
+                "forecast": forecast,
+                "tracking": tracking,
+                "verification": verification,
+                "field_lead_times":
+                    field_lead_times,
+                "plot_output_dir":
+                    plot_output_dir,
+            }
+        )
+
+        return expected_path
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "_generate_field_sequence_plot",
+        fake_generate_field_sequence_plot,
+    )
+
+    result = run_tc_verification_pipeline(
+        "forecast.zarr",
+        ibtracs_path="ibtracs.csv",
+        sid="2026204N08267",
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        generate_plots=True,
+        plot_output_dir=(
+            tmp_path / "plots"
+        ),
+        field_lead_times=[
+            54,
+            78,
+            96,
+            120,
+        ],
+    )
+
+    assert len(calls) == 1
+
+    assert calls[0][
+        "field_lead_times"
+    ] == [
+        54,
+        78,
+        96,
+        120,
+    ]
+
+    assert result.plot_paths[
+        "field_sequence"
+    ] == expected_path
+
+
+def test_run_tc_verification_pipeline_ignores_field_sequence_without_plots(
+    monkeypatch,
+):
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            initialization_time=np.datetime64(
+                "2026-07-24T00:00:00"
+            )
+        )
+    )
+
+    tracking = make_tracking_result()
+    verification = make_verification_result()
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline.open_forecast",
+        lambda path: forecast,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "evaluate_forecast_trackers",
+        lambda *args, **kwargs: tracking,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "read_ibtracs_csv",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "best_track_to_records",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "verify_tracking_workflow",
+        lambda *args, **kwargs: verification,
+    )
+
+    def fail_field_sequence(*args, **kwargs):
+        raise AssertionError(
+            "field sequence should not be generated"
+        )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "_generate_field_sequence_plot",
+        fail_field_sequence,
+    )
+
+    result = run_tc_verification_pipeline(
+        "forecast.zarr",
+        ibtracs_path="ibtracs.csv",
+        sid="2026204N08267",
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        generate_plots=False,
+        field_lead_times=[
+            54,
+            78,
+        ],
+    )
+
+    assert result.plot_paths == {}
+
+
+def test_run_tc_verification_pipeline_invalid_field_lead_times_type():
+    with pytest.raises(
+        TypeError,
+        match="field_lead_times",
+    ):
+        run_tc_verification_pipeline(
+            "forecast.zarr",
+            ibtracs_path="ibtracs.csv",
+            sid="2026204N08267",
+            lat_min=5.0,
+            lat_max=35.0,
+            lon_min=-130.0,
+            lon_max=-90.0,
+            field_lead_times=(
+                54,
+                78,
+            ),
+        )
+
+
+def test_run_tc_verification_pipeline_negative_field_lead_time():
+    with pytest.raises(
+        ValueError,
+        match="negative",
+    ):
+        run_tc_verification_pipeline(
+            "forecast.zarr",
+            ibtracs_path="ibtracs.csv",
+            sid="2026204N08267",
+            lat_min=5.0,
+            lat_max=35.0,
+            lon_min=-130.0,
+            lon_max=-90.0,
+            field_lead_times=[
+                54,
+                -6,
+            ],
+        )

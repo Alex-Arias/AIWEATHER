@@ -3,8 +3,8 @@ End-to-end tropical cyclone verification pipeline.
 
 This module orchestrates forecast loading, tropical cyclone tracking,
 IBTrACS best-track verification, persistence of verification products,
-and optional generation of standard verification figures without
-reimplementing lower-level tracking, verification, or plotting logic.
+and optional generation of standard verification figures and
+multi-lead tropical cyclone field sequences.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from pathlib import Path
 from aiweather.forecast import open_forecast
 from aiweather.plotting import (
     plot_pressure_evolution,
+    plot_tc_field_sequence,
     plot_track_error,
     plot_track_map,
     plot_wind_evolution,
@@ -327,6 +328,187 @@ def _generate_verification_plots(
     return plot_paths
 
 
+def _center_at_lead(
+    records,
+    lead_time_hours: int | float,
+):
+    """
+    Return a track center at one lead time.
+
+    Parameters
+    ----------
+    records
+        TrackRecord collection.
+
+    lead_time_hours
+        Requested forecast lead time.
+
+    Returns
+    -------
+    tuple or None
+        ``(latitude, longitude)`` when available.
+    """
+    for record in records:
+        if (
+            float(record.lead_time_hours)
+            == float(lead_time_hours)
+        ):
+            return (
+                float(record.latitude),
+                float(record.longitude),
+            )
+
+    return None
+
+
+def _generate_field_sequence_plot(
+    *,
+    forecast,
+    tracking: TrackingWorkflowResult,
+    verification: VerificationWorkflowResult,
+    field_lead_times: list[int | float],
+    plot_output_dir: Path,
+) -> Path:
+    """
+    Generate a multi-lead tropical cyclone field sequence.
+    """
+    import matplotlib.pyplot as plt
+
+    plot_output_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    centers_by_lead = {}
+    reference_centers = {}
+
+    evaluation = tracking.evaluation
+
+    wuduan_records = []
+    vitart_records = []
+
+    if (
+        evaluation is not None
+        and evaluation.wuduan_match is not None
+    ):
+        wuduan_records = (
+            evaluation.wuduan_match.records
+        )
+
+    if (
+        evaluation is not None
+        and evaluation.vitart_match is not None
+    ):
+        vitart_records = (
+            evaluation.vitart_match.records
+        )
+
+    observations = (
+        verification.observations
+    )
+
+    for lead in field_lead_times:
+
+        centers = {}
+
+        native_center = _center_at_lead(
+            tracking.native_records,
+            lead,
+        )
+
+        wuduan_center = _center_at_lead(
+            wuduan_records,
+            lead,
+        )
+
+        vitart_center = _center_at_lead(
+            vitart_records,
+            lead,
+        )
+
+        ibtracs_center = _center_at_lead(
+            observations,
+            lead,
+        )
+
+        if native_center is not None:
+            centers[
+                "Native"
+            ] = native_center
+
+        if wuduan_center is not None:
+            centers[
+                "WuDuan"
+            ] = wuduan_center
+
+        if vitart_center is not None:
+            centers[
+                "Vitart"
+            ] = vitart_center
+
+        if ibtracs_center is not None:
+            centers[
+                "IBTrACS"
+            ] = ibtracs_center
+
+        centers_by_lead[
+            lead
+        ] = centers
+
+        if ibtracs_center is not None:
+            reference_centers[
+                lead
+            ] = ibtracs_center
+
+        elif native_center is not None:
+            reference_centers[
+                lead
+            ] = native_center
+
+    figure, _ = plot_tc_field_sequence(
+        forecast.dataset,
+        lead_times=field_lead_times,
+        centers_by_lead=(
+            centers_by_lead
+        ),
+        reference_centers=(
+            reference_centers
+        ),
+        latitude_margin=8.0,
+        longitude_margin=12.0,
+        quiver_stride=16,
+        pressure_interval_hpa=4.0,
+        ncols=2,
+        figsize=(
+            14.0,
+            10.0,
+        ),
+    )
+
+    figure.suptitle(
+        "Tropical cyclone forecast fields",
+        fontsize=14,
+        y=0.98,
+    )
+
+    path = (
+        plot_output_dir
+        / "field_sequence.png"
+    )
+
+    figure.savefig(
+        path,
+        dpi=200,
+        bbox_inches="tight",
+    )
+
+    plt.close(
+        figure
+    )
+
+    return path
+
+
 def run_tc_verification_pipeline(
     forecast_path: str | Path,
     *,
@@ -341,6 +523,9 @@ def run_tc_verification_pipeline(
     output_dir: str | Path | None = None,
     generate_plots: bool = False,
     plot_output_dir: str | Path | None = None,
+    field_lead_times: list[
+        int | float
+    ] | None = None,
 ) -> TCVerificationPipelineResult:
     """
     Run tropical cyclone tracking and best-track verification.
@@ -381,6 +566,17 @@ def run_tc_verification_pipeline(
           available;
         * otherwise ``results/plots/<sid>`` is used.
 
+    field_lead_times
+        Optional forecast lead times for generating a shared-scale
+        tropical cyclone field sequence.
+
+        Field-sequence generation only occurs when
+        ``generate_plots=True``.
+
+        Example::
+
+            [54, 78, 96, 120]
+
     Returns
     -------
     TCVerificationPipelineResult
@@ -412,6 +608,39 @@ def run_tc_verification_pipeline(
         raise TypeError(
             "generate_plots must be a boolean."
         )
+
+    if field_lead_times is not None:
+
+        if not isinstance(
+            field_lead_times,
+            list,
+        ):
+            raise TypeError(
+                "field_lead_times must be "
+                "a list or None."
+            )
+
+        if not field_lead_times:
+            raise ValueError(
+                "field_lead_times cannot "
+                "be empty."
+            )
+
+        for lead in field_lead_times:
+            if not isinstance(
+                lead,
+                (int, float),
+            ):
+                raise TypeError(
+                    "field_lead_times must contain "
+                    "numeric values."
+                )
+
+            if lead < 0:
+                raise ValueError(
+                    "field_lead_times cannot contain "
+                    "negative values."
+                )
 
     forecast = open_forecast(
         forecast_path
@@ -483,6 +712,26 @@ def run_tc_verification_pipeline(
             ),
             sid=sid,
         )
+
+        if field_lead_times is not None:
+
+            field_path = (
+                _generate_field_sequence_plot(
+                    forecast=forecast,
+                    tracking=tracking,
+                    verification=verification,
+                    field_lead_times=(
+                        field_lead_times
+                    ),
+                    plot_output_dir=(
+                        resolved_plot_output_dir
+                    ),
+                )
+            )
+
+            plot_paths[
+                "field_sequence"
+            ] = field_path
 
     return TCVerificationPipelineResult(
         tracking=tracking,
