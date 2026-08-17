@@ -25,6 +25,11 @@ from .export import (
     export_verification_case,
 )
 
+from .pipeline import (
+    TCVerificationPipelineResult,
+    run_tc_verification_pipeline,
+)
+
 __all__ = [
     "BestTrackPoint",
     "best_track_to_records",
@@ -38,4 +43,7 @@ __all__ = [
     "VerificationWorkflowResult",
     "verify_tracking_workflow",
     "export_verification_case",
+    "TCVerificationPipelineResult",
+    "run_tc_verification_pipeline",
+
 ]
