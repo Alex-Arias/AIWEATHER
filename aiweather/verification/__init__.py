@@ -31,6 +31,12 @@ from .export import (
     export_verification_manifest,
 )
 
+from .batch import (
+    TCVerificationBatchResult,
+    TCVerificationCase,
+    run_tc_verification_batch,
+)
+
 __all__ = [
     "BestTrackPoint",
     "best_track_to_records",
@@ -47,5 +53,8 @@ __all__ = [
     "TCVerificationPipelineResult",
     "run_tc_verification_pipeline",
     "export_verification_manifest",
+    "TCVerificationBatchResult",
+    "TCVerificationCase",
+    "run_tc_verification_batch",
 
 ]
