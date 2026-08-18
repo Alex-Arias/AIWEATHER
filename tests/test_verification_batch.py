@@ -792,3 +792,231 @@ def test_batch_summary_export(
     ) == list(
         result.summary["sid"]
     )
+
+def test_batch_summary_contains_qc_columns(
+    monkeypatch,
+):
+    case = make_case()
+
+    pipeline_result = (
+        make_pipeline_result()
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ]
+    )
+
+    assert {
+        "qc_status",
+        "qc_reason",
+        "initial_separation_km",
+        "valid_for_aggregation",
+    }.issubset(
+        result.summary.columns
+    )
+
+
+def test_batch_qc_pass(
+    monkeypatch,
+):
+    case = make_case()
+
+    pipeline_result = (
+        make_pipeline_result()
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ]
+    )
+
+    full = result.summary[
+        result.summary["coverage"]
+        == "full"
+    ].iloc[0]
+
+    assert full[
+        "qc_status"
+    ] == "limited"
+
+    assert full[
+        "qc_reason"
+    ] == "short_overlap"
+
+    assert (
+        full[
+            "valid_for_aggregation"
+        ]
+        is False
+        or full[
+            "valid_for_aggregation"
+        ] == False
+    )
+
+def test_batch_qc_fail_initial_association(
+    monkeypatch,
+):
+    case = make_case()
+
+    bad = make_track_verification(
+        "native",
+        track_errors=[
+            10500.0,
+            10600.0,
+            10700.0,
+            10800.0,
+            10900.0,
+            11000.0,
+        ],
+        pressure_errors=[
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+            100.0,
+        ],
+        wind_errors=[
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+        ],
+    )
+
+    verification = VerificationWorkflowResult(
+        observations=[],
+        native=bad,
+        wuduan=None,
+        vitart=None,
+    )
+
+    pipeline_result = (
+        TCVerificationPipelineResult(
+            tracking=SimpleNamespace(),
+            verification=verification,
+            output_dir=None,
+            plot_paths={},
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ]
+    )
+
+    full = result.summary[
+        result.summary["coverage"]
+        == "full"
+    ].iloc[0]
+
+    assert full[
+        "qc_status"
+    ] == "fail"
+
+    assert full[
+        "qc_reason"
+    ] == "initial_association"
+
+    assert full[
+        "initial_separation_km"
+    ] == pytest.approx(
+        10500.0
+    )
+
+    assert (
+        full[
+            "valid_for_aggregation"
+        ]
+        is False
+        or full[
+            "valid_for_aggregation"
+        ] == False
+    )

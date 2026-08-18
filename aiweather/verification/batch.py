@@ -26,6 +26,9 @@ from .pipeline import (
     TCVerificationPipelineResult,
     run_tc_verification_pipeline,
 )
+from .qc import (
+    evaluate_tracker_qc,
+)
 
 
 @dataclass(slots=True)
@@ -75,6 +78,12 @@ class TCVerificationBatchResult:
 
     summary
         Aggregate per-case verification summary.
+
+    output_dir
+        Optional batch-level output directory.
+
+    summary_path
+        Optional path to the exported batch summary.
     """
 
     cases: list[TCVerificationCase]
@@ -161,6 +170,13 @@ def _verification_summary_rows(
 ) -> list[dict]:
     """
     Build aggregate summary rows for one verification case.
+
+    Tracker quality control is evaluated independently for
+    each coverage set.
+
+    QC does not modify the underlying verification metrics.
+    Instead, it adds explicit metadata indicating whether a
+    tracker result is suitable for aggregate statistics.
     """
 
     forecast = open_forecast(
@@ -198,51 +214,96 @@ def _verification_summary_rows(
             tracker_verification,
         ) in verifications.items():
 
+            qc = evaluate_tracker_qc(
+                tracker_verification
+            )
+
             rows.append(
                 {
-                    "case_id": case.case_id,
+                    "case_id":
+                        case.case_id,
+
                     "model_name":
                         metadata.model_name,
+
                     "model_version":
                         metadata.model_version,
+
                     "backend":
                         metadata.backend,
+
                     "forecast_id":
                         metadata.forecast_id,
+
                     "forecast_path":
-                        str(case.forecast_path),
+                        str(
+                            case.forecast_path
+                        ),
+
                     "sid":
                         case.sid,
+
                     "initialization_time":
                         initialization_time,
+
                     "tracker":
                         tracker_name,
+
                     "coverage":
                         coverage,
+
+                    # -----------------------------------------
+                    # QC metadata
+                    # -----------------------------------------
+
+                    "qc_status":
+                        qc.status,
+
+                    "qc_reason":
+                        qc.reason,
+
+                    "initial_separation_km":
+                        qc.initial_separation_km,
+
+                    "valid_for_aggregation":
+                        qc.valid_for_aggregation,
+
+                    # -----------------------------------------
+                    # Verification metrics
+                    # -----------------------------------------
+
                     "overlap_count":
                         tracker_verification
                         .overlap_count,
+
                     "mean_track_error_km":
                         tracker_verification
                         .mean_track_error_km,
+
                     "rmse_track_error_km":
                         tracker_verification
                         .rmse_track_error_km,
+
                     "median_track_error_km":
                         tracker_verification
                         .median_track_error_km,
+
                     "maximum_track_error_km":
                         tracker_verification
                         .maximum_track_error_km,
+
                     "pressure_mae_pa":
                         tracker_verification
                         .mean_absolute_pressure_error_pa,
+
                     "pressure_rmse_pa":
                         tracker_verification
                         .rmse_pressure_error_pa,
+
                     "wind_mae_ms":
                         tracker_verification
                         .mean_absolute_wind_error_ms,
+
                     "wind_rmse_ms":
                         tracker_verification
                         .rmse_wind_error_ms,
@@ -320,6 +381,10 @@ def run_tc_verification_batch(
     -------
     TCVerificationBatchResult
         Individual pipeline results and aggregate summary.
+
+        The summary includes tracker QC fields identifying
+        whether each verification row is suitable for
+        aggregate statistics.
     """
 
     if not isinstance(
@@ -391,6 +456,7 @@ def run_tc_verification_batch(
     summary_path = None
 
     if output_dir is not None:
+
         resolved_output_dir = Path(
             output_dir
         )
@@ -411,7 +477,9 @@ def run_tc_verification_batch(
         )
 
     return TCVerificationBatchResult(
-        cases=list(cases),
+        cases=list(
+            cases
+        ),
         results=results,
         summary=summary,
         output_dir=resolved_output_dir,

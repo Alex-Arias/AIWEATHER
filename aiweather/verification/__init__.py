@@ -37,6 +37,11 @@ from .batch import (
     run_tc_verification_batch,
 )
 
+from .qc import (
+    TrackerQCResult,
+    evaluate_tracker_qc,
+)
+
 __all__ = [
     "BestTrackPoint",
     "best_track_to_records",
@@ -56,5 +61,7 @@ __all__ = [
     "TCVerificationBatchResult",
     "TCVerificationCase",
     "run_tc_verification_batch",
+    "TrackerQCResult",
+    "evaluate_tracker_qc",
 
 ]
