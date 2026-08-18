@@ -39,6 +39,7 @@ from .comparison import (
 )
 from .export import (
     export_verification_case,
+    export_verification_manifest,
 )
 from .ibtracs import (
     read_ibtracs_csv,
@@ -819,6 +820,23 @@ def run_tc_verification_pipeline(
         resolved_output_dir,
         tracking_result=tracking,
         verification_result=verification,
+    )
+
+    export_verification_manifest(
+        resolved_output_dir,
+        forecast_path=forecast_path,
+        forecast_metadata=forecast.metadata,
+        sid=sid,
+        lat_min=lat_min,
+        lat_max=lat_max,
+        lon_min=lon_min,
+        lon_max=lon_max,
+        device=device,
+        minimum_overlap=minimum_overlap,
+        ibtracs_path=resolved_ibtracs_path,
+        ibtracs_basin=ibtracs_basin,
+        generate_plots=generate_plots,
+        field_lead_times=field_lead_times,
     )
 
     # ---------------------------------------------------------

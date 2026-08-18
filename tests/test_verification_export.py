@@ -20,9 +20,17 @@ from aiweather.verification.comparison import (
 )
 from aiweather.verification.export import (
     export_verification_case,
+    export_verification_manifest,
 )
 from aiweather.verification.workflow import (
     VerificationWorkflowResult,
+)
+
+import json
+from datetime import datetime
+
+from aiweather.forecast.metadata import (
+    ForecastMetadata,
 )
 
 
@@ -386,3 +394,171 @@ def test_export_verification_case_invalid_verification(
         raise AssertionError(
             "Expected TypeError."
         )
+
+def test_export_verification_manifest(
+    tmp_path,
+):
+    metadata = ForecastMetadata(
+        model_name="graphcast",
+        model_version="unknown",
+        backend="earth2studio",
+        forecast_id=(
+            "graphcast_gfs_"
+            "20260724T000000_240h"
+        ),
+        initialization_time=datetime(
+            2026,
+            7,
+            24,
+            0,
+            0,
+        ),
+    )
+
+    path = export_verification_manifest(
+        tmp_path,
+        forecast_path=(
+            "outputs/graphcast/"
+            "20260724T000000/"
+            "forecast.zarr"
+        ),
+        forecast_metadata=metadata,
+        sid="2026204N08267",
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        device="cuda",
+        minimum_overlap=3,
+        ibtracs_path=(
+            "data/verification/ibtracs/"
+            "ibtracs.EP.list.v04r01.csv"
+        ),
+        ibtracs_basin="EP",
+        generate_plots=True,
+        field_lead_times=[
+            54,
+            78,
+            96,
+            120,
+        ],
+    )
+
+    assert path == (
+        tmp_path
+        / "run_manifest.json"
+    )
+
+    assert path.exists()
+
+    with path.open(
+        encoding="utf-8",
+    ) as handle:
+        manifest = json.load(
+            handle
+        )
+
+    assert manifest[
+        "schema_version"
+    ] == 1
+
+    assert manifest[
+        "aiweather_version"
+    ] == "0.1.0"
+
+    assert manifest[
+        "forecast"
+    ][
+        "model_name"
+    ] == "graphcast"
+
+    assert manifest[
+        "forecast"
+    ][
+        "initialization_time"
+    ] == "2026-07-24T00:00:00"
+
+    assert manifest[
+        "verification"
+    ][
+        "sid"
+    ] == "2026204N08267"
+
+    assert manifest[
+        "verification"
+    ][
+        "minimum_overlap"
+    ] == 3
+
+    assert manifest[
+        "ibtracs"
+    ][
+        "basin"
+    ] == "EP"
+
+    assert manifest[
+        "plots"
+    ][
+        "field_lead_times_hours"
+    ] == [
+        54,
+        78,
+        96,
+        120,
+    ]
+
+    assert (
+        manifest["created_at"]
+    )
+
+def test_export_verification_manifest_without_plots(
+    tmp_path,
+):
+    metadata = ForecastMetadata(
+        model_name="graphcast",
+        model_version="unknown",
+        backend="earth2studio",
+        initialization_time=datetime(
+            2026,
+            7,
+            24,
+        ),
+    )
+
+    path = export_verification_manifest(
+        tmp_path,
+        forecast_path="forecast.zarr",
+        forecast_metadata=metadata,
+        sid="2026204N08267",
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        device="cpu",
+        minimum_overlap=1,
+        ibtracs_path="ibtracs.csv",
+        ibtracs_basin="EP",
+        generate_plots=False,
+        field_lead_times=None,
+    )
+
+    with path.open(
+        encoding="utf-8",
+    ) as handle:
+        manifest = json.load(
+            handle
+        )
+
+    assert (
+        manifest["plots"]["enabled"]
+        is False
+    )
+
+    assert (
+        manifest[
+            "plots"
+        ][
+            "field_lead_times_hours"
+        ]
+        is None
+    )

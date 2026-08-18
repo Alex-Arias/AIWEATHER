@@ -150,6 +150,19 @@ def test_run_tc_verification_pipeline(
             output_dir
         )
 
+    manifest_calls = []
+
+    def fake_export_verification_manifest(
+        output_dir,
+        **kwargs,
+    ):
+        manifest_calls.append(
+            (
+                Path(output_dir),
+                kwargs,
+            )
+        )
+
     monkeypatch.setattr(
         "aiweather.verification.pipeline."
         "open_forecast",
@@ -184,6 +197,12 @@ def test_run_tc_verification_pipeline(
         "aiweather.verification.pipeline."
         "export_verification_case",
         fake_export_verification_case,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        fake_export_verification_manifest,
     )
 
     output_dir = (
@@ -256,6 +275,68 @@ def test_run_tc_verification_pipeline(
     )
 
     assert calls[5][0] == "export"
+
+    assert len(manifest_calls) == 1
+
+    manifest_output_dir, manifest_kwargs = (
+        manifest_calls[0]
+    )
+
+    assert manifest_output_dir == output_dir
+
+    assert manifest_kwargs[
+        "forecast_path"
+    ] == "forecast.zarr"
+
+    assert manifest_kwargs[
+        "forecast_metadata"
+    ] is forecast.metadata
+
+    assert manifest_kwargs[
+        "sid"
+    ] == "2026204N08267"
+
+    assert manifest_kwargs[
+        "lat_min"
+    ] == 5.0
+
+    assert manifest_kwargs[
+        "lat_max"
+    ] == 35.0
+
+    assert manifest_kwargs[
+        "lon_min"
+    ] == -130.0
+
+    assert manifest_kwargs[
+        "lon_max"
+    ] == -90.0
+
+    assert manifest_kwargs[
+        "ibtracs_path"
+    ] == Path(
+        "ibtracs.csv"
+    )
+
+    assert manifest_kwargs[
+        "ibtracs_basin"
+    ] == "EP"
+
+    assert manifest_kwargs[
+        "device"
+    ] == "cuda"
+
+    assert manifest_kwargs[
+        "minimum_overlap"
+    ] == 3
+
+    assert manifest_kwargs[
+        "generate_plots"
+    ] is False
+
+    assert manifest_kwargs[
+        "field_lead_times"
+    ] is None
 
 
 def test_run_tc_verification_pipeline_auto_output_dir(
@@ -350,6 +431,12 @@ def test_run_tc_verification_pipeline_auto_output_dir(
         "aiweather.verification.pipeline."
         "export_verification_case",
         fake_export,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
     )
 
     result = run_tc_verification_pipeline(
@@ -452,6 +539,12 @@ def test_run_tc_verification_pipeline_auto_output_dir_without_plots(
         "aiweather.verification.pipeline."
         "export_verification_case",
         fake_export,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
     )
 
     result = run_tc_verification_pipeline(
@@ -621,6 +714,12 @@ def test_run_tc_verification_pipeline_generates_plots(
         fake_generate_plots,
     )
 
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
+    )
+
     result = run_tc_verification_pipeline(
         "forecast.zarr",
         ibtracs_path="ibtracs.csv",
@@ -728,6 +827,12 @@ def test_run_tc_verification_pipeline_default_plot_dir(
     output_dir = (
         tmp_path
         / "case"
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
     )
 
     run_tc_verification_pipeline(
@@ -865,6 +970,12 @@ def test_run_tc_verification_pipeline_generates_field_sequence(
         fake_generate_field_sequence_plot,
     )
 
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
+    )
+
     result = run_tc_verification_pipeline(
         "forecast.zarr",
         ibtracs_path="ibtracs.csv",
@@ -967,6 +1078,12 @@ def test_run_tc_verification_pipeline_ignores_field_sequence_without_plots(
         "aiweather.verification.pipeline."
         "_generate_field_sequence_plot",
         fail_field_sequence,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
     )
 
     result = run_tc_verification_pipeline(
@@ -1105,6 +1222,12 @@ def test_pipeline_explicit_ibtracs_path_bypasses_cache(
             Path(output_dir),
     )
 
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
+    )
+
     run_tc_verification_pipeline(
         "forecast.zarr",
         sid="2026204N08267",
@@ -1222,6 +1345,12 @@ def test_pipeline_auto_ibtracs_resolution(
         "export_verification_case",
         lambda output_dir, **kwargs:
             Path(output_dir),
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
     )
 
     run_tc_verification_pipeline(
@@ -1361,6 +1490,12 @@ def test_pipeline_explicit_output_dir_overrides_auto(
         "export_verification_case",
         lambda output_dir, **kwargs:
             Path(output_dir),
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_manifest",
+        lambda *args, **kwargs: None,
     )
 
     result = run_tc_verification_pipeline(

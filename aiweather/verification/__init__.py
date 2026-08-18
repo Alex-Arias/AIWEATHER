@@ -21,13 +21,14 @@ from .workflow import (
     verify_tracking_workflow,
 )
 
-from .export import (
-    export_verification_case,
-)
-
 from .pipeline import (
     TCVerificationPipelineResult,
     run_tc_verification_pipeline,
+)
+
+from .export import (
+    export_verification_case,
+    export_verification_manifest,
 )
 
 __all__ = [
@@ -45,5 +46,6 @@ __all__ = [
     "export_verification_case",
     "TCVerificationPipelineResult",
     "run_tc_verification_pipeline",
+    "export_verification_manifest",
 
 ]
