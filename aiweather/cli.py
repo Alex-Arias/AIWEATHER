@@ -205,6 +205,49 @@ def _build_parser() -> argparse.ArgumentParser:
 
     return parser
 
+def _validate_verify_tc_args(
+    args: argparse.Namespace,
+) -> None:
+    """
+    Validate ``verify-tc`` command-line arguments.
+    """
+    if args.lat_min >= args.lat_max:
+        raise ValueError(
+            "--lat-min must be smaller than "
+            "--lat-max."
+        )
+
+    if args.lon_min >= args.lon_max:
+        raise ValueError(
+            "--lon-min must be smaller than "
+            "--lon-max."
+        )
+
+    if args.minimum_overlap < 1:
+        raise ValueError(
+            "--minimum-overlap must be at least 1."
+        )
+
+    if args.ibtracs_max_age_hours <= 0.0:
+        raise ValueError(
+            "--ibtracs-max-age-hours must be "
+            "positive."
+        )
+
+    if args.field_leads is not None:
+        if any(
+            lead < 0
+            for lead in args.field_leads
+        ):
+            raise ValueError(
+                "--field-leads cannot contain "
+                "negative values."
+            )
+
+        if not args.plots:
+            raise ValueError(
+                "--field-leads requires --plots."
+            )
 
 def _run_verify_tc(
     args: argparse.Namespace,
@@ -212,6 +255,10 @@ def _run_verify_tc(
     """
     Execute the ``verify-tc`` subcommand.
     """
+    _validate_verify_tc_args(
+        args
+    )
+
     result = run_tc_verification_pipeline(
         args.forecast,
         sid=args.sid,
@@ -311,9 +358,14 @@ def main(
     )
 
     if args.command == "verify-tc":
-        return _run_verify_tc(
-            args
-        )
+        try:
+            return _run_verify_tc(
+                args
+            )
+        except ValueError as exc:
+            parser.error(
+                str(exc)
+            )
 
     parser.error(
         f"unsupported command: {args.command}"

@@ -401,3 +401,92 @@ def test_cli_version(capsys):
     assert output == (
         f"aiweather {__version__}"
     )
+
+@pytest.mark.parametrize(
+    (
+        "extra_args",
+        "message",
+    ),
+    [
+        (
+            [
+                "--lat-min", "35",
+                "--lat-max", "5",
+            ],
+            "--lat-min",
+        ),
+        (
+            [
+                "--lon-min", "-90",
+                "--lon-max", "-130",
+            ],
+            "--lon-min",
+        ),
+        (
+            [
+                "--minimum-overlap", "0",
+            ],
+            "--minimum-overlap",
+        ),
+        (
+            [
+                "--ibtracs-max-age-hours", "0",
+            ],
+            "--ibtracs-max-age-hours",
+        ),
+        (
+            [
+                "--field-leads", "-6", "24",
+                "--plots",
+            ],
+            "--field-leads",
+        ),
+        (
+            [
+                "--field-leads", "24", "48",
+            ],
+            "--field-leads requires --plots",
+        ),
+    ],
+)
+def test_cli_verify_tc_validation(
+    extra_args,
+    message,
+    capsys,
+):
+    argv = [
+        "verify-tc",
+        "--forecast",
+        "forecast.zarr",
+        "--sid",
+        "2026204N08267",
+        "--lat-min",
+        "5",
+        "--lat-max",
+        "35",
+        "--lon-min",
+        "-130",
+        "--lon-max",
+        "-90",
+    ]
+
+    argv.extend(
+        extra_args
+    )
+
+    with pytest.raises(
+        SystemExit,
+    ) as exc:
+        main(
+            argv
+        )
+
+    assert exc.value.code == 2
+
+    error = (
+        capsys
+        .readouterr()
+        .err
+    )
+
+    assert message in error
