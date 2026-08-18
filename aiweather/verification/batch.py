@@ -80,6 +80,8 @@ class TCVerificationBatchResult:
     cases: list[TCVerificationCase]
     results: list[TCVerificationPipelineResult]
     summary: pd.DataFrame
+    output_dir: Path | None = None
+    summary_path: Path | None = None
 
 
 def _validate_case(
@@ -266,6 +268,7 @@ def run_tc_verification_batch(
     ),
     ibtracs_max_age_hours: float = 48.0,
     ibtracs_force_update: bool = False,
+    output_dir: str | Path | None = None,
 ) -> TCVerificationBatchResult:
     """
     Run tropical cyclone verification for multiple cases.
@@ -304,6 +307,14 @@ def run_tc_verification_batch(
 
     ibtracs_force_update
         Force refresh of automatically managed IBTrACS data.
+
+    output_dir
+        Optional directory for batch-level products.
+
+        When provided, AIWeather writes the aggregate
+        verification table to ``batch_summary.csv``.
+
+        When None, no batch-level files are written.
 
     Returns
     -------
@@ -376,8 +387,33 @@ def run_tc_verification_batch(
         summary_rows
     )
 
+    resolved_output_dir = None
+    summary_path = None
+
+    if output_dir is not None:
+        resolved_output_dir = Path(
+            output_dir
+        )
+
+        resolved_output_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        summary_path = (
+            resolved_output_dir
+            / "batch_summary.csv"
+        )
+
+        summary.to_csv(
+            summary_path,
+            index=False,
+        )
+
     return TCVerificationBatchResult(
         cases=list(cases),
         results=results,
         summary=summary,
+        output_dir=resolved_output_dir,
+        summary_path=summary_path,
     )

@@ -657,3 +657,138 @@ def test_batch_case_empty_case_id():
                 case,
             ]
         )
+
+def test_batch_without_output_dir_does_not_export(
+    monkeypatch,
+):
+    case = make_case()
+
+    pipeline_result = (
+        make_pipeline_result()
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ]
+    )
+
+    assert result.output_dir is None
+    assert result.summary_path is None
+
+def test_batch_summary_export(
+    monkeypatch,
+    tmp_path,
+):
+    case = make_case()
+
+    pipeline_result = (
+        make_pipeline_result()
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    output_dir = (
+        tmp_path
+        / "batch"
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ],
+        output_dir=output_dir,
+    )
+
+    expected = (
+        output_dir
+        / "batch_summary.csv"
+    )
+
+    assert result.output_dir == (
+        output_dir
+    )
+
+    assert result.summary_path == (
+        expected
+    )
+
+    assert expected.exists()
+
+    exported = pd.read_csv(
+        expected
+    )
+
+    assert len(exported) == len(
+        result.summary
+    )
+
+    assert list(
+        exported["tracker"]
+    ) == list(
+        result.summary["tracker"]
+    )
+
+    assert list(
+        exported["coverage"]
+    ) == list(
+        result.summary["coverage"]
+    )
+
+    assert list(
+        exported["sid"]
+    ) == list(
+        result.summary["sid"]
+    )
