@@ -11,6 +11,7 @@ import argparse
 from pathlib import Path
 import sys
 
+from aiweather import __version__
 from aiweather.verification import (
     run_tc_verification_pipeline,
 )
@@ -25,6 +26,14 @@ def _build_parser() -> argparse.ArgumentParser:
         description=(
             "AIWeather forecasting, tropical cyclone "
             "tracking, and verification toolkit."
+        ),
+    )
+
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=(
+            f"%(prog)s {__version__}"
         ),
     )
 

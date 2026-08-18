@@ -1,7 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-import numpy as np
 import pytest
 
 from aiweather.tracking.workflow import (
@@ -14,6 +13,8 @@ from aiweather.verification.pipeline import (
 from aiweather.verification.workflow import (
     VerificationWorkflowResult,
 )
+
+from datetime import datetime
 
 
 def make_tracking_result():
@@ -41,8 +42,13 @@ def test_run_tc_verification_pipeline(
 
     forecast = SimpleNamespace(
         metadata=SimpleNamespace(
-            initialization_time=np.datetime64(
-                "2026-07-24T00:00:00"
+
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
             )
         )
     )
@@ -235,8 +241,12 @@ def test_run_tc_verification_pipeline(
         "best_track_to_records"
     )
 
-    assert calls[3][2] == np.datetime64(
-        "2026-07-24T00:00:00"
+    assert calls[3][2] == datetime(
+        2026,
+        7,
+        24,
+        0,
+        0,
     )
 
     assert calls[4][0] == "verify"
@@ -248,13 +258,134 @@ def test_run_tc_verification_pipeline(
     assert calls[5][0] == "export"
 
 
-def test_run_tc_verification_pipeline_without_export(
+def test_run_tc_verification_pipeline_auto_output_dir(
     monkeypatch,
+    tmp_path,
 ):
     forecast = SimpleNamespace(
         metadata=SimpleNamespace(
-            initialization_time=np.datetime64(
-                "2026-07-24T00:00:00"
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
+            )
+        )
+    )
+
+    tracking = make_tracking_result()
+    verification = make_verification_result()
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline.open_forecast",
+        lambda path: forecast,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "evaluate_forecast_trackers",
+        lambda *args, **kwargs: tracking,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "ensure_ibtracs_dataset",
+        lambda **kwargs: Path(
+            "ibtracs.csv"
+        ),
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "read_ibtracs_csv",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "best_track_to_records",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "verify_tracking_workflow",
+        lambda *args, **kwargs: verification,
+    )
+
+    resolved_output = (
+        tmp_path
+        / "verification"
+        / (
+            "2026204N08267_"
+            "20260724T000000"
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "OutputManager."
+        "build_verification_output_dir",
+        lambda **kwargs: resolved_output,
+    )
+
+    captured = {}
+
+    def fake_export(
+        output_dir,
+        *,
+        tracking_result,
+        verification_result,
+    ):
+        captured[
+            "output_dir"
+        ] = output_dir
+
+        return Path(
+            output_dir
+        )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_case",
+        fake_export,
+    )
+
+    result = run_tc_verification_pipeline(
+        "forecast.zarr",
+        sid="2026204N08267",
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        output_dir=None,
+    )
+
+    assert captured[
+        "output_dir"
+    ] == resolved_output
+
+    assert result.output_dir == (
+        resolved_output
+    )
+
+    assert result.plot_paths == {}
+
+#------------------------------------------------------------------------------------------------------
+
+def test_run_tc_verification_pipeline_auto_output_dir_without_plots(
+    monkeypatch,
+    tmp_path,
+):
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
             )
         )
     )
@@ -292,15 +423,35 @@ def test_run_tc_verification_pipeline_without_export(
         lambda *args, **kwargs: verification,
     )
 
-    def fail_export(*args, **kwargs):
-        raise AssertionError(
-            "export should not be called"
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "OutputManager.BASE_RESULTS",
+        tmp_path,
+    )
+
+    exported_paths = []
+
+    def fake_export(
+        output_dir,
+        *,
+        tracking_result,
+        verification_result,
+    ):
+        exported_paths.append(
+            Path(output_dir)
+        )
+
+        assert tracking_result is tracking
+        assert verification_result is verification
+
+        return Path(
+            output_dir
         )
 
     monkeypatch.setattr(
         "aiweather.verification.pipeline."
         "export_verification_case",
-        fail_export,
+        fake_export,
     )
 
     result = run_tc_verification_pipeline(
@@ -313,7 +464,18 @@ def test_run_tc_verification_pipeline_without_export(
         lon_max=-90.0,
     )
 
-    assert result.output_dir is None
+    expected = (
+        tmp_path
+        / "verification"
+        / "2026204N08267_20260724T000000"
+    )
+
+    assert exported_paths == [
+        expected,
+    ]
+
+    assert result.output_dir == expected
+    assert result.plot_paths == {}
 
 
 def test_run_tc_verification_pipeline_invalid_overlap():
@@ -370,8 +532,12 @@ def test_run_tc_verification_pipeline_generates_plots(
 ):
     forecast = SimpleNamespace(
         metadata=SimpleNamespace(
-            initialization_time=np.datetime64(
-                "2026-07-24T00:00:00"
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
             )
         )
     )
@@ -406,6 +572,14 @@ def test_run_tc_verification_pipeline_generates_plots(
         "aiweather.verification.pipeline."
         "verify_tracking_workflow",
         lambda *args, **kwargs: verification,
+    )
+
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_case",
+        lambda output_dir, **kwargs:
+            Path(output_dir),
     )
 
     plot_dir = (
@@ -456,6 +630,7 @@ def test_run_tc_verification_pipeline_generates_plots(
         lon_min=-130.0,
         lon_max=-90.0,
         generate_plots=True,
+        output_dir=(tmp_path / "verification"),
         plot_output_dir=plot_dir,
     )
 
@@ -480,8 +655,12 @@ def test_run_tc_verification_pipeline_default_plot_dir(
 ):
     forecast = SimpleNamespace(
         metadata=SimpleNamespace(
-            initialization_time=np.datetime64(
-                "2026-07-24T00:00:00"
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
             )
         )
     )
@@ -593,8 +772,12 @@ def test_run_tc_verification_pipeline_generates_field_sequence(
 ):
     forecast = SimpleNamespace(
         metadata=SimpleNamespace(
-            initialization_time=np.datetime64(
-                "2026-07-24T00:00:00"
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
             )
         ),
         dataset=object(),
@@ -630,6 +813,14 @@ def test_run_tc_verification_pipeline_generates_field_sequence(
         "aiweather.verification.pipeline."
         "verify_tracking_workflow",
         lambda *args, **kwargs: verification,
+    )
+
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_case",
+        lambda output_dir, **kwargs:
+            Path(output_dir),
     )
 
     monkeypatch.setattr(
@@ -683,6 +874,7 @@ def test_run_tc_verification_pipeline_generates_field_sequence(
         lon_min=-130.0,
         lon_max=-90.0,
         generate_plots=True,
+        output_dir=(tmp_path / "verification"),
         plot_output_dir=(
             tmp_path / "plots"
         ),
@@ -712,11 +904,16 @@ def test_run_tc_verification_pipeline_generates_field_sequence(
 
 def test_run_tc_verification_pipeline_ignores_field_sequence_without_plots(
     monkeypatch,
+    tmp_path,
 ):
     forecast = SimpleNamespace(
         metadata=SimpleNamespace(
-            initialization_time=np.datetime64(
-                "2026-07-24T00:00:00"
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
             )
         )
     )
@@ -753,6 +950,14 @@ def test_run_tc_verification_pipeline_ignores_field_sequence_without_plots(
         lambda *args, **kwargs: verification,
     )
 
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_case",
+        lambda output_dir, **kwargs:
+            Path(output_dir),
+    )
+
     def fail_field_sequence(*args, **kwargs):
         raise AssertionError(
             "field sequence should not be generated"
@@ -772,6 +977,7 @@ def test_run_tc_verification_pipeline_ignores_field_sequence_without_plots(
         lat_max=35.0,
         lon_min=-130.0,
         lon_max=-90.0,
+        output_dir=(tmp_path / "verification"),
         generate_plots=False,
         field_lead_times=[
             54,
@@ -823,11 +1029,16 @@ def test_run_tc_verification_pipeline_negative_field_lead_time():
 
 def test_pipeline_explicit_ibtracs_path_bypasses_cache(
     monkeypatch,
+    tmp_path,
 ):
     forecast = SimpleNamespace(
         metadata=SimpleNamespace(
-            initialization_time=np.datetime64(
-                "2026-07-24T00:00:00"
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
             )
         )
     )
@@ -886,6 +1097,14 @@ def test_pipeline_explicit_ibtracs_path_bypasses_cache(
         lambda *args, **kwargs: verification,
     )
 
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_case",
+        lambda output_dir, **kwargs:
+            Path(output_dir),
+    )
+
     run_tc_verification_pipeline(
         "forecast.zarr",
         sid="2026204N08267",
@@ -894,6 +1113,7 @@ def test_pipeline_explicit_ibtracs_path_bypasses_cache(
         lon_min=-130.0,
         lon_max=-90.0,
         ibtracs_path="frozen.csv",
+        output_dir=(tmp_path / "verification"),
     )
 
     assert captured["path"] == Path(
@@ -911,8 +1131,12 @@ def test_pipeline_auto_ibtracs_resolution(
 ):
     forecast = SimpleNamespace(
         metadata=SimpleNamespace(
-            initialization_time=np.datetime64(
-                "2026-07-24T00:00:00"
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
             )
         )
     )
@@ -992,6 +1216,14 @@ def test_pipeline_auto_ibtracs_resolution(
         lambda *args, **kwargs: verification,
     )
 
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_case",
+        lambda output_dir, **kwargs:
+            Path(output_dir),
+    )
+
     run_tc_verification_pipeline(
         "forecast.zarr",
         sid="2026204N08267",
@@ -1004,6 +1236,7 @@ def test_pipeline_auto_ibtracs_resolution(
         ibtracs_cache_dir=tmp_path,
         ibtracs_max_age_hours=72.0,
         ibtracs_force_update=True,
+        output_dir=(tmp_path / "verification"),
     )
 
     assert calls == [
@@ -1047,4 +1280,126 @@ def test_pipeline_invalid_ibtracs_max_age():
             lon_min=-130.0,
             lon_max=-90.0,
             ibtracs_max_age_hours=0.0,
+        )
+
+def test_pipeline_explicit_output_dir_overrides_auto(
+    monkeypatch,
+    tmp_path,
+):
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+                0,
+                0,
+            )
+        )
+    )
+
+    tracking = make_tracking_result()
+    verification = make_verification_result()
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline.open_forecast",
+        lambda path: forecast,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "evaluate_forecast_trackers",
+        lambda *args, **kwargs: tracking,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "ensure_ibtracs_dataset",
+        lambda **kwargs: Path(
+            "ibtracs.csv"
+        ),
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "read_ibtracs_csv",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "best_track_to_records",
+        lambda *args, **kwargs: [],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "verify_tracking_workflow",
+        lambda *args, **kwargs: verification,
+    )
+
+    def fail_auto_output(*args, **kwargs):
+        raise AssertionError(
+            "automatic output naming "
+            "should not be called"
+        )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "OutputManager."
+        "build_verification_output_dir",
+        fail_auto_output,
+    )
+
+    explicit_output = (
+        tmp_path
+        / "custom_case"
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline."
+        "export_verification_case",
+        lambda output_dir, **kwargs:
+            Path(output_dir),
+    )
+
+    result = run_tc_verification_pipeline(
+        "forecast.zarr",
+        sid="2026204N08267",
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        output_dir=explicit_output,
+    )
+
+    assert result.output_dir == (
+        explicit_output
+    )
+
+def test_pipeline_missing_initialization_time(
+    monkeypatch,
+):
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            initialization_time=None
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.pipeline.open_forecast",
+        lambda path: forecast,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="initialization_time",
+    ):
+        run_tc_verification_pipeline(
+            "forecast.zarr",
+            sid="2026204N08267",
+            lat_min=5.0,
+            lat_max=35.0,
+            lon_min=-130.0,
+            lon_max=-90.0,
         )

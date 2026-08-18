@@ -374,3 +374,30 @@ def test_cli_verify_tc_explicit_ibtracs(
     assert kwargs[
         "ibtracs_force_update"
     ] is True
+
+def test_cli_version(capsys):
+    from aiweather import (
+        __version__,
+    )
+
+    with pytest.raises(
+        SystemExit,
+    ) as exc:
+        main(
+            [
+                "--version",
+            ]
+        )
+
+    assert exc.value.code == 0
+
+    output = (
+        capsys
+        .readouterr()
+        .out
+        .strip()
+    )
+
+    assert output == (
+        f"aiweather {__version__}"
+    )

@@ -16,6 +16,9 @@ from aiweather.data import (
     ensure_ibtracs_dataset,
 )
 from aiweather.forecast import open_forecast
+from aiweather.output.manager import (
+    OutputManager,
+)
 from aiweather.plotting import (
     plot_pressure_evolution,
     plot_tc_field_sequence,
@@ -566,8 +569,11 @@ def run_tc_verification_pipeline(
         Minimum overlap required when matching tracker paths.
 
     output_dir
-        Optional directory where verification CSV products
-        are exported.
+        Optional verification output directory.
+
+        When omitted, AIWeather creates a canonical directory:
+
+        ``results/verification/<SID>_<INIT_TIME>``
 
     generate_plots
         Generate standard verification figures when True.
@@ -575,11 +581,8 @@ def run_tc_verification_pipeline(
     plot_output_dir
         Optional directory for generated figures.
 
-        If omitted while ``generate_plots=True``:
-
-        * ``output_dir / "plots"`` is used when output_dir is
-          available;
-        * otherwise ``results/plots/<sid>`` is used.
+        When omitted while ``generate_plots=True``, plots are
+        written to ``<resolved_output_dir>/plots``.
 
     field_lead_times
         Optional forecast lead times for generating a shared-scale
@@ -609,8 +612,8 @@ def run_tc_verification_pipeline(
     Returns
     -------
     TCVerificationPipelineResult
-        Tracking result, verification result, optional
-        export directory, and generated plot paths.
+        Tracking result, verification result, resolved output
+        directory, and generated plot paths.
     """
     if minimum_overlap < 1:
         raise ValueError(
@@ -711,9 +714,46 @@ def run_tc_verification_pipeline(
                     "negative values."
                 )
 
+    # ---------------------------------------------------------
+    # Open forecast
+    # ---------------------------------------------------------
+
     forecast = open_forecast(
         forecast_path
     )
+
+    initialization_time = (
+        forecast.metadata.initialization_time
+    )
+
+    if initialization_time is None:
+        raise ValueError(
+            "Forecast initialization_time metadata "
+            "is required for verification output naming."
+        )
+
+    # ---------------------------------------------------------
+    # Resolve verification output directory
+    # ---------------------------------------------------------
+
+    if output_dir is None:
+        resolved_output_dir = (
+            OutputManager
+            .build_verification_output_dir(
+                sid=sid,
+                initialization_time=(
+                    initialization_time
+                ),
+            )
+        )
+    else:
+        resolved_output_dir = Path(
+            output_dir
+        )
+
+    # ---------------------------------------------------------
+    # Run trackers
+    # ---------------------------------------------------------
 
     tracking = evaluate_forecast_trackers(
         forecast,
@@ -757,9 +797,13 @@ def run_tc_verification_pipeline(
     best_track_records = best_track_to_records(
         best_track_points,
         initialization_time=(
-            forecast.metadata.initialization_time
+            initialization_time
         ),
     )
+
+    # ---------------------------------------------------------
+    # Verify tracker output
+    # ---------------------------------------------------------
 
     verification = verify_tracking_workflow(
         tracking,
@@ -767,31 +811,29 @@ def run_tc_verification_pipeline(
         observation_name=f"ibtracs_{sid}",
     )
 
-    exported = None
+    # ---------------------------------------------------------
+    # Export verification products
+    # ---------------------------------------------------------
 
-    if output_dir is not None:
-        exported = export_verification_case(
-            output_dir,
-            tracking_result=tracking,
-            verification_result=verification,
-        )
+    exported = export_verification_case(
+        resolved_output_dir,
+        tracking_result=tracking,
+        verification_result=verification,
+    )
+
+    # ---------------------------------------------------------
+    # Optional plots
+    # ---------------------------------------------------------
 
     plot_paths: dict[str, Path] = {}
 
     if generate_plots:
 
         if plot_output_dir is None:
-            if output_dir is not None:
-                resolved_plot_output_dir = (
-                    Path(output_dir)
-                    / "plots"
-                )
-            else:
-                resolved_plot_output_dir = (
-                    Path("results")
-                    / "plots"
-                    / sid
-                )
+            resolved_plot_output_dir = (
+                resolved_output_dir
+                / "plots"
+            )
         else:
             resolved_plot_output_dir = Path(
                 plot_output_dir
