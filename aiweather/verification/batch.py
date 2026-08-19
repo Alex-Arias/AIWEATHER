@@ -34,6 +34,10 @@ from .aggregate import (
     aggregate_verification_summary,
 )
 
+from .lead_time import (
+    aggregate_batch_lead_time_verification,
+)
+
 @dataclass(slots=True)
 class TCVerificationCase:
     """
@@ -65,6 +69,7 @@ class TCVerificationCase:
     lon_max: float
     case_id: str | None = None
 
+
 @dataclass(slots=True)
 class TCVerificationBatchResult:
     """
@@ -84,6 +89,9 @@ class TCVerificationBatchResult:
     aggregate
         QC-filtered aggregate verification statistics.
 
+    lead_time
+        QC-filtered lead-time-binned verification statistics.
+
     output_dir
         Optional batch-level output directory.
 
@@ -92,15 +100,20 @@ class TCVerificationBatchResult:
 
     aggregate_path
         Optional path to the exported aggregate summary.
+
+    lead_time_path
+        Optional path to the exported lead-time summary.
     """
 
     cases: list[TCVerificationCase]
     results: list[TCVerificationPipelineResult]
     summary: pd.DataFrame
     aggregate: pd.DataFrame
+    lead_time: pd.DataFrame
     output_dir: Path | None = None
     summary_path: Path | None = None
     aggregate_path: Path | None = None
+    lead_time_path: Path | None = None
 
 
 def _validate_case(
@@ -470,9 +483,18 @@ def run_tc_verification_batch(
         )
     )
 
+    lead_time = (
+        aggregate_batch_lead_time_verification(
+            cases,
+            results,
+            summary,
+        )
+    )
+
     resolved_output_dir = None
     summary_path = None
     aggregate_path = None
+    lead_time_path = None
 
     if output_dir is not None:
         resolved_output_dir = Path(
@@ -494,6 +516,11 @@ def run_tc_verification_batch(
             / "batch_aggregate.csv"
         )
 
+        lead_time_path = (
+            resolved_output_dir
+            / "batch_lead_time.csv"
+        )
+
         summary.to_csv(
             summary_path,
             index=False,
@@ -504,6 +531,11 @@ def run_tc_verification_batch(
             index=False,
         )
 
+        lead_time.to_csv(
+            lead_time_path,
+            index=False,
+        )
+
     return TCVerificationBatchResult(
         cases=list(
             cases
@@ -511,7 +543,9 @@ def run_tc_verification_batch(
         results=results,
         summary=summary,
         aggregate=aggregate,
+        lead_time=lead_time,
         output_dir=resolved_output_dir,
         summary_path=summary_path,
         aggregate_path=aggregate_path,
+        lead_time_path=lead_time_path,
     )

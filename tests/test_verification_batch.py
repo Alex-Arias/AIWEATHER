@@ -703,6 +703,7 @@ def test_batch_without_output_dir_does_not_export(
     assert result.output_dir is None
     assert result.summary_path is None
     assert result.aggregate_path is None
+    assert result.lead_time_path is None
 
 def test_batch_summary_export(
     monkeypatch,
@@ -763,6 +764,11 @@ def test_batch_summary_export(
         / "batch_aggregate.csv"
     )
 
+    expected_lead_time = (
+        output_dir
+        / "batch_lead_time.csv"
+    )
+
     assert result.output_dir == (
         output_dir
     )
@@ -775,8 +781,13 @@ def test_batch_summary_export(
         expected_aggregate
     )
 
+    assert result.lead_time_path == (
+        expected_lead_time
+    )
+
     assert expected_summary.exists()
     assert expected_aggregate.exists()
+    assert expected_lead_time.exists()
 
     exported_summary = pd.read_csv(
         expected_summary
@@ -784,6 +795,10 @@ def test_batch_summary_export(
 
     exported_aggregate = pd.read_csv(
         expected_aggregate
+    )
+
+    exported_lead_time = pd.read_csv(
+        expected_lead_time
     )
 
     assert len(exported_summary) == len(
@@ -818,6 +833,18 @@ def test_batch_summary_export(
         exported_aggregate
     ) == len(
         result.aggregate
+    )
+
+    assert list(
+        exported_lead_time.columns
+    ) == list(
+        result.lead_time.columns
+    )
+
+    assert len(
+        exported_lead_time
+    ) == len(
+        result.lead_time
     )
 
 def test_batch_summary_contains_qc_columns(
@@ -1081,6 +1108,17 @@ def test_batch_result_contains_aggregate(
         ],
     )
 
+    valid.table[
+        "lead_time_hours"
+    ] = [
+        0.0,
+        6.0,
+        12.0,
+        18.0,
+        24.0,
+        30.0,
+    ]
+
     verification = VerificationWorkflowResult(
         observations=[],
         native=valid,
@@ -1228,3 +1266,123 @@ def test_batch_aggregate_excludes_invalid_qc(
     )
 
     assert result.aggregate.empty
+
+def test_batch_result_contains_lead_time(
+    monkeypatch,
+):
+    case = make_case()
+
+    valid = make_track_verification(
+        "native",
+        track_errors=[
+            100.0,
+            120.0,
+            140.0,
+            160.0,
+            180.0,
+            200.0,
+        ],
+        pressure_errors=[
+            1000.0,
+            1100.0,
+            1200.0,
+            1300.0,
+            1400.0,
+            1500.0,
+        ],
+        wind_errors=[
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+        ],
+    )
+
+    valid.table[
+        "lead_time_hours"
+    ] = [
+        0.0,
+        6.0,
+        12.0,
+        18.0,
+        24.0,
+        30.0,
+    ]
+
+    verification = VerificationWorkflowResult(
+        observations=[],
+        native=valid,
+        wuduan=None,
+        vitart=None,
+    )
+
+    pipeline_result = (
+        TCVerificationPipelineResult(
+            tracking=SimpleNamespace(),
+            verification=verification,
+            output_dir=None,
+            plot_paths={},
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ]
+    )
+
+    assert not result.lead_time.empty
+
+    assert set(
+        result.lead_time[
+            "lead_time_bin"
+        ]
+    ) == {
+        "0-24h",
+        "24-48h",
+    }
+
+    first = result.lead_time[
+        result.lead_time[
+            "lead_time_bin"
+        ].eq(
+            "0-24h"
+        )
+    ].iloc[0]
+
+    assert first[
+        "case_count"
+    ] == 1
+
+    assert first[
+        "point_count"
+    ] == 4
