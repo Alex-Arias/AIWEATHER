@@ -42,6 +42,10 @@ from .qc import (
     evaluate_tracker_qc,
 )
 
+from .aggregate import (
+    aggregate_verification_summary,
+)
+
 __all__ = [
     "BestTrackPoint",
     "best_track_to_records",
@@ -63,5 +67,6 @@ __all__ = [
     "run_tc_verification_batch",
     "TrackerQCResult",
     "evaluate_tracker_qc",
+    "aggregate_verification_summary",
 
 ]

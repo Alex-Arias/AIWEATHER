@@ -30,6 +30,9 @@ from .qc import (
     evaluate_tracker_qc,
 )
 
+from .aggregate import (
+    aggregate_verification_summary,
+)
 
 @dataclass(slots=True)
 class TCVerificationCase:
@@ -62,7 +65,6 @@ class TCVerificationCase:
     lon_max: float
     case_id: str | None = None
 
-
 @dataclass(slots=True)
 class TCVerificationBatchResult:
     """
@@ -77,20 +79,28 @@ class TCVerificationBatchResult:
         Single-case verification pipeline results.
 
     summary
-        Aggregate per-case verification summary.
+        Per-case verification summary, including tracker QC.
+
+    aggregate
+        QC-filtered aggregate verification statistics.
 
     output_dir
         Optional batch-level output directory.
 
     summary_path
-        Optional path to the exported batch summary.
+        Optional path to the exported per-case batch summary.
+
+    aggregate_path
+        Optional path to the exported aggregate summary.
     """
 
     cases: list[TCVerificationCase]
     results: list[TCVerificationPipelineResult]
     summary: pd.DataFrame
+    aggregate: pd.DataFrame
     output_dir: Path | None = None
     summary_path: Path | None = None
+    aggregate_path: Path | None = None
 
 
 def _validate_case(
@@ -372,19 +382,21 @@ def run_tc_verification_batch(
     output_dir
         Optional directory for batch-level products.
 
-        When provided, AIWeather writes the aggregate
-        verification table to ``batch_summary.csv``.
+        When provided, AIWeather writes the per-case
+        verification table to ``batch_summary.csv`` and
+        the QC-filtered aggregate statistics to
+        ``batch_aggregate.csv``.
 
         When None, no batch-level files are written.
 
     Returns
     -------
     TCVerificationBatchResult
-        Individual pipeline results and aggregate summary.
+        Individual pipeline results, QC-aware per-case
+        summary, and aggregate verification statistics.
 
-        The summary includes tracker QC fields identifying
-        whether each verification row is suitable for
-        aggregate statistics.
+        The aggregate statistics include only rows marked
+        as valid for aggregation by tracker QC.
     """
 
     if not isinstance(
@@ -452,11 +464,17 @@ def run_tc_verification_batch(
         summary_rows
     )
 
+    aggregate = (
+        aggregate_verification_summary(
+            summary
+        )
+    )
+
     resolved_output_dir = None
     summary_path = None
+    aggregate_path = None
 
     if output_dir is not None:
-
         resolved_output_dir = Path(
             output_dir
         )
@@ -471,8 +489,18 @@ def run_tc_verification_batch(
             / "batch_summary.csv"
         )
 
+        aggregate_path = (
+            resolved_output_dir
+            / "batch_aggregate.csv"
+        )
+
         summary.to_csv(
             summary_path,
+            index=False,
+        )
+
+        aggregate.to_csv(
+            aggregate_path,
             index=False,
         )
 
@@ -482,6 +510,8 @@ def run_tc_verification_batch(
         ),
         results=results,
         summary=summary,
+        aggregate=aggregate,
         output_dir=resolved_output_dir,
         summary_path=summary_path,
+        aggregate_path=aggregate_path,
     )

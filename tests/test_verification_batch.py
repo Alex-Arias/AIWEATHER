@@ -702,6 +702,7 @@ def test_batch_without_output_dir_does_not_export(
 
     assert result.output_dir is None
     assert result.summary_path is None
+    assert result.aggregate_path is None
 
 def test_batch_summary_export(
     monkeypatch,
@@ -752,9 +753,14 @@ def test_batch_summary_export(
         output_dir=output_dir,
     )
 
-    expected = (
+    expected_summary = (
         output_dir
         / "batch_summary.csv"
+    )
+
+    expected_aggregate = (
+        output_dir
+        / "batch_aggregate.csv"
     )
 
     assert result.output_dir == (
@@ -762,35 +768,56 @@ def test_batch_summary_export(
     )
 
     assert result.summary_path == (
-        expected
+        expected_summary
     )
 
-    assert expected.exists()
-
-    exported = pd.read_csv(
-        expected
+    assert result.aggregate_path == (
+        expected_aggregate
     )
 
-    assert len(exported) == len(
+    assert expected_summary.exists()
+    assert expected_aggregate.exists()
+
+    exported_summary = pd.read_csv(
+        expected_summary
+    )
+
+    exported_aggregate = pd.read_csv(
+        expected_aggregate
+    )
+
+    assert len(exported_summary) == len(
         result.summary
     )
 
     assert list(
-        exported["tracker"]
+        exported_summary["tracker"]
     ) == list(
         result.summary["tracker"]
     )
 
     assert list(
-        exported["coverage"]
+        exported_summary["coverage"]
     ) == list(
         result.summary["coverage"]
     )
 
     assert list(
-        exported["sid"]
+        exported_summary["sid"]
     ) == list(
         result.summary["sid"]
+    )
+
+    assert list(
+        exported_aggregate.columns
+    ) == list(
+        result.aggregate.columns
+    )
+
+    assert len(
+        exported_aggregate
+    ) == len(
+        result.aggregate
     )
 
 def test_batch_summary_contains_qc_columns(
@@ -1020,3 +1047,184 @@ def test_batch_qc_fail_initial_association(
             "valid_for_aggregation"
         ] == False
     )
+
+def test_batch_result_contains_aggregate(
+    monkeypatch,
+):
+    case = make_case()
+
+    valid = make_track_verification(
+        "native",
+        track_errors=[
+            100.0,
+            120.0,
+            140.0,
+            160.0,
+            180.0,
+            200.0,
+        ],
+        pressure_errors=[
+            1000.0,
+            1100.0,
+            1200.0,
+            1300.0,
+            1400.0,
+            1500.0,
+        ],
+        wind_errors=[
+            10.0,
+            11.0,
+            12.0,
+            13.0,
+            14.0,
+            15.0,
+        ],
+    )
+
+    verification = VerificationWorkflowResult(
+        observations=[],
+        native=valid,
+        wuduan=None,
+        vitart=None,
+    )
+
+    pipeline_result = (
+        TCVerificationPipelineResult(
+            tracking=SimpleNamespace(),
+            verification=verification,
+            output_dir=None,
+            plot_paths={},
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ]
+    )
+
+    assert not result.aggregate.empty
+
+    full = result.aggregate[
+        result.aggregate["coverage"]
+        == "full"
+    ].iloc[0]
+
+    assert full[
+        "case_count"
+    ] == 1
+
+    assert full[
+        "mean_case_track_error_km"
+    ] == pytest.approx(
+        150.0
+    )
+
+def test_batch_aggregate_excludes_invalid_qc(
+    monkeypatch,
+):
+    case = make_case()
+
+    invalid = make_track_verification(
+        "native",
+        track_errors=[
+            10000.0,
+            10100.0,
+            10200.0,
+            10300.0,
+            10400.0,
+            10500.0,
+        ],
+        pressure_errors=[
+            100.0,
+        ] * 6,
+        wind_errors=[
+            1.0,
+        ] * 6,
+    )
+
+    verification = VerificationWorkflowResult(
+        observations=[],
+        native=invalid,
+        wuduan=None,
+        vitart=None,
+    )
+
+    pipeline_result = (
+        TCVerificationPipelineResult(
+            tracking=SimpleNamespace(),
+            verification=verification,
+            output_dir=None,
+            plot_paths={},
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ]
+    )
+
+    assert not result.summary.empty
+
+    assert (
+        result.summary[
+            "valid_for_aggregation"
+        ].eq(False).all()
+    )
+
+    assert result.aggregate.empty
