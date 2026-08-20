@@ -16,6 +16,11 @@ from .fields import (
     wind_speed,
 )
 
+from .lead_time import (
+    plot_lead_time_metric,
+    plot_lead_time_summary,
+)
+
 __all__ = [
     "normalize_longitude",
     "plot_track_map",
@@ -26,4 +31,6 @@ __all__ = [
     "plot_tc_field_sequence",
     "storm_centered_extent",
     "wind_speed",
+    "plot_lead_time_metric",
+    "plot_lead_time_summary",
 ]
