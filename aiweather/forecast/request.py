@@ -25,6 +25,8 @@ class ForecastRequest:
 
     lead_time: int
 
+    datasource_source: str | None = None
+
     # ---------------------------------------------------------
     # Optional output
     # ---------------------------------------------------------

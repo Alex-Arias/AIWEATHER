@@ -103,7 +103,9 @@ class BaseRunner:
             self.load_model()
 
         if self.data is None:
-            self.load_data()
+            self.load_data(
+                request
+            )
 
         self.build_output(request)
 

@@ -45,7 +45,11 @@ class PXRunner(BaseRunner):
             f"{self.MODEL_NAME} loaded."
         )
 
-    def load_data(self):
+
+    def load_data(
+        self,
+        request,
+    ):
 
         from aiweather.backends.earth2studio import (
             load_data_source,
@@ -60,7 +64,9 @@ class PXRunner(BaseRunner):
         )
 
         self.data = load_data_source(
-            self.MODEL_NAME
+            self.MODEL_NAME,
+            datasource=request.datasource,
+            source=request.datasource_source,
         )
 
         print(

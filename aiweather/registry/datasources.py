@@ -1,23 +1,56 @@
 """
 Datasource registry.
 
-Currently every AIWeather prognostic model uses GFS.
-
-Future versions may map individual models to ERA5, HRRR,
-IFS, custom datasets, etc.
+Maps AIWeather prognostic models to the Earth2Studio
+datasource appropriate for their required input fields.
 """
 
 from __future__ import annotations
 
-from earth2studio.data import GFS
+from earth2studio.data import (
+    GFS,
+    IFS,
+)
 
 
-DEFAULT_DATASOURCE = GFS
+_DATASOURCE_REGISTRY = {
+    "graphcast": {
+        "name": "gfs",
+        "class": GFS,
+    },
+    "aifs2": {
+        "name": "ifs",
+        "class": IFS,
+    },
+}
 
 
-def get_data_source(model_name: str):
+def get_data_source(
+    model_name: str,
+):
     """
-    Return the datasource class associated with a model.
+    Return the datasource configuration associated with a model.
     """
 
-    return DEFAULT_DATASOURCE
+    if not isinstance(
+        model_name,
+        str,
+    ):
+        raise TypeError(
+            "model_name must be a string."
+        )
+
+    key = model_name.lower()
+
+    try:
+        return _DATASOURCE_REGISTRY[
+            key
+        ]
+
+    except KeyError:
+        raise ValueError(
+            f"No datasource is configured "
+            f"for model '{model_name}'. "
+            f"Configured models: "
+            f"{', '.join(sorted(_DATASOURCE_REGISTRY))}"
+        )
