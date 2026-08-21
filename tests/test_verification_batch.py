@@ -658,6 +658,131 @@ def test_batch_case_empty_case_id():
             ]
         )
 
+
+def test_batch_points_contains_point_level_records(
+    monkeypatch,
+):
+    case = make_case(
+        case_id="genevieve_20260724",
+    )
+
+    pipeline_result = (
+        make_pipeline_result()
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "run_tc_verification_pipeline",
+        lambda *args, **kwargs:
+            pipeline_result,
+    )
+
+    forecast = SimpleNamespace(
+        metadata=SimpleNamespace(
+            model_name="graphcast",
+            model_version="unknown",
+            backend="earth2studio",
+            forecast_id="forecast-id",
+            initialization_time=datetime(
+                2026,
+                7,
+                24,
+            ),
+        )
+    )
+
+    monkeypatch.setattr(
+        "aiweather.verification.batch."
+        "open_forecast",
+        lambda path: forecast,
+    )
+
+    result = run_tc_verification_batch(
+        [
+            case,
+        ]
+    )
+
+    points = result.points
+
+    assert not points.empty
+
+    assert set(
+        points["coverage"]
+    ) == {
+        "full",
+        "common",
+    }
+
+    assert set(
+        points["tracker"]
+    ) == {
+        "native",
+    }
+
+    assert set(
+        points["case_id"]
+    ) == {
+        "genevieve_20260724",
+    }
+
+    assert set(
+        points["model_name"]
+    ) == {
+        "graphcast",
+    }
+
+    assert set(
+        points["sid"]
+    ) == {
+        "2026204N08267",
+    }
+
+    assert {
+        "valid_time",
+        "track_error_km",
+        "pressure_error_pa",
+        "wind_error_ms",
+        "qc_status",
+        "qc_reason",
+        "initial_separation_km",
+        "valid_for_aggregation",
+    }.issubset(
+        points.columns
+    )
+
+    full = points[
+        points["coverage"]
+        == "full"
+    ]
+
+    assert len(full) == 3
+
+    assert list(
+        full["track_error_km"]
+    ) == [
+        100.0,
+        200.0,
+        300.0,
+    ]
+
+    assert list(
+        full["pressure_error_pa"]
+    ) == [
+        1000.0,
+        -2000.0,
+        1500.0,
+    ]
+
+    assert list(
+        full["wind_error_ms"]
+    ) == [
+        5.0,
+        -10.0,
+        7.0,
+    ]
+
+
 def test_batch_without_output_dir_does_not_export(
     monkeypatch,
 ):
@@ -704,6 +829,7 @@ def test_batch_without_output_dir_does_not_export(
     assert result.summary_path is None
     assert result.aggregate_path is None
     assert result.lead_time_path is None
+    assert result.points_path is None
 
 def test_batch_summary_export(
     monkeypatch,
@@ -769,6 +895,11 @@ def test_batch_summary_export(
         / "batch_lead_time.csv"
     )
 
+    expected_points = (
+        output_dir
+        / "batch_points.csv"
+    )
+
     assert result.output_dir == (
         output_dir
     )
@@ -785,9 +916,14 @@ def test_batch_summary_export(
         expected_lead_time
     )
 
+    assert result.points_path == (
+        expected_points
+    )
+
     assert expected_summary.exists()
     assert expected_aggregate.exists()
     assert expected_lead_time.exists()
+    assert expected_points.exists()
 
     exported_summary = pd.read_csv(
         expected_summary
@@ -799,6 +935,10 @@ def test_batch_summary_export(
 
     exported_lead_time = pd.read_csv(
         expected_lead_time
+    )
+
+    exported_points = pd.read_csv(
+        expected_points
     )
 
     assert len(exported_summary) == len(
@@ -846,6 +986,37 @@ def test_batch_summary_export(
     ) == len(
         result.lead_time
     )
+
+    assert list(
+        exported_points.columns
+    ) == list(
+        result.points.columns
+    )
+
+    assert len(
+        exported_points
+    ) == len(
+        result.points
+    )
+
+    assert list(
+        exported_points["tracker"]
+    ) == list(
+        result.points["tracker"]
+    )
+
+    assert list(
+        exported_points["coverage"]
+    ) == list(
+        result.points["coverage"]
+    )
+
+    assert list(
+        exported_points["sid"]
+    ) == list(
+        result.points["sid"]
+    )
+
 
 def test_batch_summary_contains_qc_columns(
     monkeypatch,

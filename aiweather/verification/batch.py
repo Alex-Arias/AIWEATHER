@@ -103,6 +103,13 @@ class TCVerificationBatchResult:
 
     lead_time_path
         Optional path to the exported lead-time summary.
+
+    points
+        Point-level forecast-versus-observation verification
+        records for every case, tracker, and coverage set.
+
+    points_path
+        Optional path to the exported point-level verification table.
     """
 
     cases: list[TCVerificationCase]
@@ -110,10 +117,12 @@ class TCVerificationBatchResult:
     summary: pd.DataFrame
     aggregate: pd.DataFrame
     lead_time: pd.DataFrame
+    points: pd.DataFrame
     output_dir: Path | None = None
     summary_path: Path | None = None
     aggregate_path: Path | None = None
     lead_time_path: Path | None = None
+    points_path: Path | None = None
 
 
 def _validate_case(
@@ -335,6 +344,129 @@ def _verification_summary_rows(
 
     return rows
 
+def _verification_point_rows(
+    *,
+    case: TCVerificationCase,
+    result: TCVerificationPipelineResult,
+) -> list[dict]:
+    """
+    Build point-level verification rows for one case.
+
+    Both full tracker coverage and common-overlap coverage are
+    included. Each row preserves the underlying point-level
+    verification values while adding case, model, tracker, and
+    quality-control metadata.
+    """
+
+    forecast = open_forecast(
+        case.forecast_path
+    )
+
+    metadata = forecast.metadata
+
+    initialization_time = (
+        metadata.initialization_time
+    )
+
+    rows: list[dict] = []
+
+    verification = result.verification
+
+    full = verification.verifications
+
+    common = common_overlap_verifications(
+        full
+    )
+
+    coverage_sets = (
+        ("full", full),
+        ("common", common),
+    )
+
+    for (
+        coverage,
+        verifications,
+    ) in coverage_sets:
+
+        for (
+            tracker_name,
+            tracker_verification,
+        ) in verifications.items():
+
+            qc = evaluate_tracker_qc(
+                tracker_verification
+            )
+
+            table = (
+                tracker_verification
+                .table
+                .copy()
+            )
+
+            for record in table.to_dict(
+                orient="records"
+            ):
+
+                rows.append(
+                    {
+                        "case_id":
+                            case.case_id,
+
+                        "model_name":
+                            metadata.model_name,
+
+                        "model_version":
+                            metadata.model_version,
+
+                        "backend":
+                            metadata.backend,
+
+                        "forecast_id":
+                            metadata.forecast_id,
+
+                        "forecast_path":
+                            str(
+                                case.forecast_path
+                            ),
+
+                        "sid":
+                            case.sid,
+
+                        "initialization_time":
+                            initialization_time,
+
+                        "tracker":
+                            tracker_name,
+
+                        "coverage":
+                            coverage,
+
+                        # -------------------------------------
+                        # QC metadata
+                        # -------------------------------------
+
+                        "qc_status":
+                            qc.status,
+
+                        "qc_reason":
+                            qc.reason,
+
+                        "initial_separation_km":
+                            qc.initial_separation_km,
+
+                        "valid_for_aggregation":
+                            qc.valid_for_aggregation,
+
+                        # -------------------------------------
+                        # Point-level verification fields
+                        # -------------------------------------
+
+                        **record,
+                    }
+                )
+
+    return rows
+
 
 def run_tc_verification_batch(
     cases: list[TCVerificationCase],
@@ -435,6 +567,7 @@ def run_tc_verification_batch(
     ] = []
 
     summary_rows: list[dict] = []
+    point_rows: list[dict] = []
 
     for case in cases:
 
@@ -473,8 +606,19 @@ def run_tc_verification_batch(
             )
         )
 
+        point_rows.extend(
+            _verification_point_rows(
+                case=case,
+                result=result,
+            )
+        )
+
     summary = pd.DataFrame(
         summary_rows
+    )
+
+    points = pd.DataFrame(
+        point_rows
     )
 
     aggregate = (
@@ -495,6 +639,7 @@ def run_tc_verification_batch(
     summary_path = None
     aggregate_path = None
     lead_time_path = None
+    points_path = None
 
     if output_dir is not None:
         resolved_output_dir = Path(
@@ -521,6 +666,11 @@ def run_tc_verification_batch(
             / "batch_lead_time.csv"
         )
 
+        points_path = (
+            resolved_output_dir
+            / "batch_points.csv"
+        )
+
         summary.to_csv(
             summary_path,
             index=False,
@@ -536,6 +686,11 @@ def run_tc_verification_batch(
             index=False,
         )
 
+        points.to_csv(
+            points_path,
+            index=False,
+        )
+
     return TCVerificationBatchResult(
         cases=list(
             cases
@@ -544,8 +699,10 @@ def run_tc_verification_batch(
         summary=summary,
         aggregate=aggregate,
         lead_time=lead_time,
+        points=points,
         output_dir=resolved_output_dir,
         summary_path=summary_path,
         aggregate_path=aggregate_path,
         lead_time_path=lead_time_path,
+        points_path=points_path,
     )
