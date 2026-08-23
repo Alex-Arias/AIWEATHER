@@ -34,6 +34,16 @@ STORMS = {
             "aifs2_fausto_wave_radial_profiles.csv"
         ),
     },
+    "Genevieve": {
+        "diagnostics": Path(
+            "results/waves/aifs2_genevieve/"
+            "aifs2_genevieve_wave_diagnostics.csv"
+        ),
+        "radial": Path(
+            "results/waves/aifs2_genevieve/"
+            "aifs2_genevieve_wave_radial_profiles.csv"
+        ),
+    },
 }
 
 OUTPUT_DIR = Path(
@@ -268,6 +278,12 @@ for storm in STORMS:
                     - wind_peak_time
                 ),
 
+            "wind_to_radial_mean_swh_lag_h":
+                (
+                    radial_peak_time
+                    - wind_peak_time
+                ),
+
             "max_radial_mean_swh_m":
                 radial_peak_swh,
 
@@ -291,7 +307,7 @@ summary = pd.DataFrame(
 
 summary_path = (
     OUTPUT_DIR
-    / "aifs2_elida_fausto_wave_summary.csv"
+    / "aifs2_epac_3storm_wave_summary.csv"
 )
 
 summary.to_csv(
@@ -305,11 +321,11 @@ summary.to_csv(
 # ============================================================
 
 fig, axes = plt.subplots(
-    3,
+    4,
     1,
     figsize=(
         11,
-        11,
+        14,
     ),
     sharex=False,
 )
@@ -442,7 +458,7 @@ ax.legend()
 
 # ============================================================
 # Panel 3
-# Peak timing / lag
+# Peak timing
 # ============================================================
 
 ax = axes[2]
@@ -451,11 +467,11 @@ x = np.arange(
     len(summary)
 )
 
-width = 0.34
+width = 0.24
 
 
 ax.bar(
-    x - width / 2.0,
+    x - width,
     summary[
         "wind_peak_lead_h"
     ],
@@ -464,37 +480,22 @@ ax.bar(
 )
 
 ax.bar(
-    x + width / 2.0,
+    x,
     summary[
         "swh_peak_lead_h"
     ],
     width,
-    label="SWH peak",
+    label="Pointwise SWH peak",
 )
 
-
-for index, row in summary.iterrows():
-
-    ymax = max(
-        row[
-            "wind_peak_lead_h"
-        ],
-        row[
-            "swh_peak_lead_h"
-        ],
-    )
-
-    ax.text(
-        index,
-        ymax + 5,
-        (
-            f"Lag = "
-            f"{int(row['wind_to_swh_lag_h'])} h"
-        ),
-        ha="center",
-        va="bottom",
-        fontsize=9,
-    )
+ax.bar(
+    x + width,
+    summary[
+        "radial_mean_peak_lead_h"
+    ],
+    width,
+    label="Radial-mean SWH peak",
+)
 
 
 ax.set_xticks(
@@ -512,7 +513,7 @@ ax.set_ylabel(
 )
 
 ax.set_title(
-    "Timing of maximum 300-km wind and SWH"
+    "Timing of storm-relative wind and wave maxima"
 )
 
 ax.grid(
@@ -521,7 +522,128 @@ ax.grid(
     alpha=0.3,
 )
 
-ax.legend()
+ax.legend(
+    fontsize=9,
+)
+
+
+# ============================================================
+# Panel 4
+# Wind-to-wave timing offsets
+# ============================================================
+
+ax = axes[3]
+
+x = np.arange(
+    len(summary)
+)
+
+width = 0.34
+
+
+ax.bar(
+    x - width / 2.0,
+    summary[
+        "wind_to_swh_lag_h"
+    ],
+    width,
+    label="Pointwise SWH − wind",
+)
+
+ax.bar(
+    x + width / 2.0,
+    summary[
+        "wind_to_radial_mean_swh_lag_h"
+    ],
+    width,
+    label="Radial-mean SWH − wind",
+)
+
+
+ax.axhline(
+    0.0,
+    linewidth=1.0,
+)
+
+
+for index, row in summary.iterrows():
+
+    point_lag = int(
+        row[
+            "wind_to_swh_lag_h"
+        ]
+    )
+
+    radial_lag = int(
+        row[
+            "wind_to_radial_mean_swh_lag_h"
+        ]
+    )
+
+    ax.text(
+        index - width / 2.0,
+        point_lag
+        + (
+            2
+            if point_lag >= 0
+            else -4
+        ),
+        f"{point_lag:+d} h",
+        ha="center",
+        va=(
+            "bottom"
+            if point_lag >= 0
+            else "top"
+        ),
+        fontsize=9,
+    )
+
+    ax.text(
+        index + width / 2.0,
+        radial_lag
+        + (
+            2
+            if radial_lag >= 0
+            else -4
+        ),
+        f"{radial_lag:+d} h",
+        ha="center",
+        va=(
+            "bottom"
+            if radial_lag >= 0
+            else "top"
+        ),
+        fontsize=9,
+    )
+
+
+ax.set_xticks(
+    x
+)
+
+ax.set_xticklabels(
+    summary[
+        "storm"
+    ]
+)
+
+ax.set_ylabel(
+    "Wave peak minus wind peak (h)"
+)
+
+ax.set_title(
+    "Wind-to-wave peak timing offset"
+)
+
+ax.grid(
+    True,
+    axis="y",
+    alpha=0.3,
+)
+
+ax.legend(
+    fontsize=9,
+)
 
 
 # ============================================================
@@ -530,7 +652,7 @@ ax.legend()
 
 fig.suptitle(
     "AIFS2 Tropical-Cyclone Wave Comparison\n"
-    "Elida vs Fausto — WuDuan storm-relative diagnostics",
+    "Elida, Fausto, and Genevieve — WuDuan storm-relative diagnostics",
     fontsize=14,
     fontweight="bold",
 )
@@ -551,12 +673,12 @@ fig.tight_layout(
 
 png_path = (
     OUTPUT_DIR
-    / "aifs2_elida_vs_fausto_wave_comparison.png"
+    / "aifs2_epac_3storm_wave_comparison.png"
 )
 
 pdf_path = (
     OUTPUT_DIR
-    / "aifs2_elida_vs_fausto_wave_comparison.pdf"
+    / "aifs2_epac_3storm_wave_comparison.pdf"
 )
 
 
