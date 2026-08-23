@@ -14,6 +14,8 @@ AIFS2 or the tracker.
 
 from pathlib import Path
 
+import argparse
+
 import matplotlib
 
 matplotlib.use("Agg")
@@ -23,17 +25,56 @@ import numpy as np
 import pandas as pd
 
 from aiweather.forecast import open_forecast
+from wave_cases import get_case
 
 
 # ============================================================
-# Configuration
+# Command-line configuration
+# ============================================================
+
+parser = argparse.ArgumentParser(
+    description=(
+        "AIFS2 tropical-cyclone wave analysis."
+    )
+)
+
+parser.add_argument(
+    "--storm",
+    required=True,
+    help=(
+        "Storm key defined in scripts/wave_cases.py "
+        "(for example: elida, fausto, genevieve)."
+    ),
+)
+
+args = parser.parse_args()
+
+CASE = get_case(
+    args.storm
+)
+
+STORM_KEY = args.storm.lower()
+
+STORM_NAME = CASE[
+    "storm_name"
+]
+
+INIT = CASE[
+    "init"
+]
+
+CASE_ID = CASE[
+    "case_id"
+]
+
+
+# ============================================================
+# Paths
 # ============================================================
 
 FORECAST_PATH = Path(
-    "outputs/aifs2/"
-    "20260714T120000/"
-    "forecast.zarr"
-)
+    "outputs/aifs2"
+) / INIT / "forecast.zarr"
 
 TRACK_POINTS_PATH = Path(
     "results/verification/batch/"
@@ -42,15 +83,13 @@ TRACK_POINTS_PATH = Path(
 )
 
 OUTPUT_DIR = Path(
-    "results/waves/"
-    "aifs2_elida"
-)
+    "results/waves"
+) / f"aifs2_{STORM_KEY}"
 
-CASE_ID = (
-    "elida_20260714T120000"
-)
 
-STORM_NAME = "Elida"
+# ============================================================
+# Analysis configuration
+# ============================================================
 
 LEAD_TIMES = [
     0,
@@ -64,7 +103,7 @@ LEAD_TIMES = [
 LAT_MIN = 5.0
 LAT_MAX = 35.0
 
-LON_MIN = -130.0
+LON_MIN = -160.0
 LON_MAX = -90.0
 
 RADII_KM = [
@@ -73,8 +112,25 @@ RADII_KM = [
     800.0,
 ]
 
-# Sparse directional-vector spacing.
 QUIVER_STEP = 12
+
+
+# ============================================================
+# Fixed cross-storm plotting scales
+# ============================================================
+
+SWH_MIN = 0.0
+SWH_MAX = 10.0
+
+MWP_MIN = 2.0
+MWP_MAX = 16.0
+
+MWD_MIN = 0.0
+MWD_MAX = 360.0
+
+WIND_MIN = 0.0
+WIND_MAX = 27.0
+
 
 OUTPUT_DIR.mkdir(
     parents=True,
@@ -573,13 +629,6 @@ for lead_hours in LEAD_TIMES:
             10,
         ),
     )
-
-
-    # Fixed scales across ALL lead times
-    SWH_MIN,  SWH_MAX  = 0.0,   7.0       # m
-    MWP_MIN,  MWP_MAX  = 2.0,  14.0       # s
-    MWD_MIN,  MWD_MAX  = 0.0, 360.0       # degrees
-    WIND_MIN, WIND_MAX = 0.0,  21.0       # m/s
 
 
     # --------------------------------------------------------
