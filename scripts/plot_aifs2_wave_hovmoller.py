@@ -1,4 +1,5 @@
 from pathlib import Path
+import argparse
 
 import matplotlib
 
@@ -9,17 +10,56 @@ import numpy as np
 import pandas as pd
 
 from aiweather.forecast import open_forecast
+from wave_cases import get_case
 
 
 # ============================================================
-# Configuration
+# Command-line configuration
+# ============================================================
+
+parser = argparse.ArgumentParser(
+    description=(
+        "Plot AIFS2 storm-relative wave Hovmoller diagnostics."
+    )
+)
+
+parser.add_argument(
+    "--storm",
+    required=True,
+    help=(
+        "Storm key defined in scripts/wave_cases.py "
+        "(for example: elida, fausto, genevieve)."
+    ),
+)
+
+args = parser.parse_args()
+
+CASE = get_case(
+    args.storm
+)
+
+STORM_KEY = args.storm.lower()
+
+STORM_NAME = CASE[
+    "storm_name"
+]
+
+INIT = CASE[
+    "init"
+]
+
+CASE_ID = CASE[
+    "case_id"
+]
+
+
+# ============================================================
+# Paths
 # ============================================================
 
 FORECAST_PATH = Path(
-    "outputs/aifs2/"
-    "20260714T120000/"
-    "forecast.zarr"
-)
+    "outputs/aifs2"
+) / INIT / "forecast.zarr"
 
 TRACK_POINTS_PATH = Path(
     "results/verification/batch/"
@@ -28,18 +68,13 @@ TRACK_POINTS_PATH = Path(
 )
 
 OUTPUT_DIR = Path(
-    "results/waves/"
-    "aifs2_elida"
-)
-
-CASE_ID = "elida_20260714T120000"
-
-STORM_NAME = "Elida"
+    "results/waves"
+) / f"aifs2_{STORM_KEY}"
 
 LAT_MIN = 5.0
 LAT_MAX = 35.0
 
-LON_MIN = -135.0
+LON_MIN = -160.0
 LON_MAX = -90.0
 
 RADIAL_BIN_KM = 50.0
@@ -575,7 +610,7 @@ pcm = ax.pcolormesh(
     swh_matrix,
     shading="auto",
     vmin=0.0,
-    vmax=7.0,
+    vmax=10.0,
 )
 
 
