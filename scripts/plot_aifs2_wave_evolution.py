@@ -1,4 +1,5 @@
 from pathlib import Path
+import argparse
 
 import matplotlib
 
@@ -7,23 +8,53 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from wave_cases import get_case
+
 
 # ============================================================
-# Configuration
+# Command-line configuration
 # ============================================================
 
-INPUT_PATH = Path(
-    "results/waves/"
-    "aifs2_elida/"
-    "aifs2_elida_wave_diagnostics.csv"
+parser = argparse.ArgumentParser(
+    description=(
+        "Plot AIFS2 storm-relative wave evolution."
+    )
 )
+
+parser.add_argument(
+    "--storm",
+    required=True,
+    help=(
+        "Storm key defined in scripts/wave_cases.py "
+        "(for example: elida, fausto, genevieve)."
+    ),
+)
+
+args = parser.parse_args()
+
+CASE = get_case(
+    args.storm
+)
+
+STORM_KEY = args.storm.lower()
+
+STORM_NAME = CASE[
+    "storm_name"
+]
+
+
+# ============================================================
+# Paths
+# ============================================================
 
 OUTPUT_DIR = Path(
-    "results/waves/"
-    "aifs2_elida"
-)
+    "results/waves"
+) / f"aifs2_{STORM_KEY}"
 
-STORM_NAME = "Elida"
+INPUT_PATH = (
+    OUTPUT_DIR
+    / f"aifs2_{STORM_KEY}_wave_diagnostics.csv"
+)
 
 REFERENCE_LEADS = [
     24,
