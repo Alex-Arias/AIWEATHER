@@ -6,6 +6,7 @@ from aiweather.verification.comparison import (
     TrackVerification,
     align_by_valid_time,
     compare_forecast_to_best_track,
+    common_overlap_verifications,
 )
 
 
@@ -451,4 +452,114 @@ def test_common_overlap_verifications_invalid_contents():
             {
                 "native": object(),
             }
+        )
+
+def test_compare_forecast_to_best_track_no_overlap_has_schema():
+    verification = compare_forecast_to_best_track(
+        [
+            make_record(
+                "2026-08-18T00:00:00",
+                168,
+                20.0,
+                200.0,
+            ),
+        ],
+        [
+            make_record(
+                "2026-08-15T00:00:00",
+                96,
+                16.0,
+                228.0,
+            ),
+        ],
+        forecast_name="vitart",
+    )
+
+    assert verification.overlap_count == 0
+    assert verification.table.empty
+
+    assert list(
+        verification.table.columns
+    ) == [
+        "valid_time",
+        "lead_time_hours",
+        "forecast_latitude",
+        "forecast_longitude",
+        "observed_latitude",
+        "observed_longitude",
+        "track_error_km",
+        "forecast_pressure_pa",
+        "observed_pressure_pa",
+        "pressure_error_pa",
+        "forecast_wind_ms",
+        "observed_wind_ms",
+        "wind_error_ms",
+    ]
+
+
+def test_common_overlap_with_zero_overlap_verification():
+    native = compare_forecast_to_best_track(
+        [
+            make_record(
+                "2026-08-15T00:00:00",
+                96,
+                16.0,
+                228.0,
+            ),
+        ],
+        [
+            make_record(
+                "2026-08-15T00:00:00",
+                96,
+                16.0,
+                228.0,
+            ),
+        ],
+        forecast_name="native",
+    )
+
+    vitart = compare_forecast_to_best_track(
+        [
+            make_record(
+                "2026-08-18T00:00:00",
+                168,
+                20.0,
+                200.0,
+            ),
+        ],
+        [
+            make_record(
+                "2026-08-15T00:00:00",
+                96,
+                16.0,
+                228.0,
+            ),
+        ],
+        forecast_name="vitart",
+    )
+
+    result = common_overlap_verifications(
+        {
+            "native": native,
+            "vitart": vitart,
+        }
+    )
+
+    assert set(result) == {
+        "native",
+        "vitart",
+    }
+
+    assert (
+        result["native"].overlap_count
+        == 0
+    )
+    assert (
+        result["vitart"].overlap_count
+        == 0
+    )
+
+    for verification in result.values():
+        assert "valid_time" in (
+            verification.table.columns
         )

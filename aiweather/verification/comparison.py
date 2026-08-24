@@ -400,7 +400,26 @@ def compare_forecast_to_best_track(
             }
         )
 
-    table = pd.DataFrame(rows)
+    columns = [
+        "valid_time",
+        "lead_time_hours",
+        "forecast_latitude",
+        "forecast_longitude",
+        "observed_latitude",
+        "observed_longitude",
+        "track_error_km",
+        "forecast_pressure_pa",
+        "observed_pressure_pa",
+        "pressure_error_pa",
+        "forecast_wind_ms",
+        "observed_wind_ms",
+        "wind_error_ms",
+    ]
+
+    table = pd.DataFrame(
+        rows,
+        columns=columns,
+    )
 
     return TrackVerification(
         forecast_name=forecast_name,
