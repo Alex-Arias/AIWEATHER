@@ -30,19 +30,19 @@ import pandas as pd
 
 GRAPHCAST_POINTS = Path(
     "results/verification/batch/"
-    "graphcast_epac_3storm/"
+    "graphcast_epac_4storm/"
     "batch_points.csv"
 )
 
 AIFS2_POINTS = Path(
     "results/verification/batch/"
-    "aifs2_epac_3storm/"
+    "aifs2_epac_4storm/"
     "batch_points.csv"
 )
 
 OUTPUT_DIR = Path(
     "results/verification/comparison/"
-    "graphcast_vs_aifs2_epac_3storm"
+    "graphcast_vs_aifs2_epac_4storm"
 )
 
 OUTPUT_DIR.mkdir(
@@ -62,6 +62,10 @@ STORMS = [
     (
         "genevieve_20260724T000000",
         "Genevieve",
+    ),
+    (
+        "hernan_20260811T000000",
+        "Hernan",
     ),
 ]
 
@@ -684,8 +688,8 @@ tracker_summary.to_csv(
 
 fig, axes = plt.subplots(
     1,
-    3,
-    figsize=(16, 5.5),
+    4,
+    figsize=(20, 5.5),
     sharey=True,
 )
 
@@ -814,8 +818,8 @@ track_png, track_pdf = save_figure(
 
 fig, axes = plt.subplots(
     1,
-    3,
-    figsize=(16, 5.5),
+    4,
+    figsize=(20, 5.5),
     sharey=True,
 )
 
@@ -928,8 +932,8 @@ error_png, error_pdf = save_figure(
 
 fig, axes = plt.subplots(
     1,
-    3,
-    figsize=(16, 5.5),
+    4,
+    figsize=(20, 5.5),
     sharey=True,
 )
 
@@ -956,17 +960,30 @@ for ax, (
         linewidth=1.2,
     )
 
-    ax.plot(
-        subset[
-            "lead_time_hours_graphcast"
-        ],
-        subset[
-            "delta_track_error_km"
-        ],
-        marker="o",
-        markersize=4,
-        linewidth=2,
-    )
+    if subset.empty:
+        ax.text(
+            0.5,
+            0.5,
+            "No paired WuDuan\ncomparison available",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=10,
+            fontstyle="italic",
+            alpha=0.7,
+        )
+    else:
+        ax.plot(
+            subset[
+                "lead_time_hours_graphcast"
+            ],
+            subset[
+                "delta_track_error_km"
+            ],
+            marker="o",
+            markersize=4,
+            linewidth=2,
+        )
 
     ax.set_title(
         storm_name,
@@ -1029,8 +1046,8 @@ delta_png, delta_pdf = save_figure(
 
 fig, axes = plt.subplots(
     1,
-    3,
-    figsize=(16, 5.5),
+    4,
+    figsize=(20, 5.5),
     sharey=True,
 )
 
@@ -1164,8 +1181,8 @@ native_track_png, native_track_pdf = save_figure(
 
 fig, axes = plt.subplots(
     1,
-    3,
-    figsize=(16, 5.5),
+    4,
+    figsize=(20, 5.5),
     sharey=True,
 )
 
@@ -1304,7 +1321,6 @@ for ax, (
                 "lead_time_hours"
             ].isin(
                 [
-                    0,
                     48,
                     96,
                     144,
@@ -1387,8 +1403,8 @@ all_tracks_png, all_tracks_pdf = save_figure(
 
 fig, axes = plt.subplots(
     1,
-    3,
-    figsize=(16, 5.5),
+    4,
+    figsize=(20, 5.5),
     sharey=True,
 )
 
@@ -1506,12 +1522,13 @@ native_error_png, native_error_pdf = save_figure(
 #     Elida
 #     Fausto
 #     Genevieve
+#     Hernan
 # ============================================================
 
 fig, axes = plt.subplots(
     2,
-    3,
-    figsize=(16, 9),
+    4,
+    figsize=(20, 9),
     sharex=True,
     sharey="row",
 )
@@ -1586,6 +1603,32 @@ for row_index, (
             linestyle="-",
             label="WuDuan",
         )
+
+        if native.empty:
+            ax.text(
+                0.5,
+                0.64,
+                "No native track",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=9.5,
+                fontstyle="italic",
+                alpha=0.7,
+            )
+
+        if wuduan.empty:
+            ax.text(
+                0.5,
+                0.42,
+                "No accepted WuDuan track",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=9.5,
+                fontstyle="italic",
+                alpha=0.7,
+            )
 
         ax.set_xlim(
             0,
