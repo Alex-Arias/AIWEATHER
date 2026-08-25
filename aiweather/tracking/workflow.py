@@ -34,7 +34,7 @@ class TrackingWorkflowResult:
     Result of the complete tropical cyclone tracking workflow.
     """
 
-    genesis: GenesisResult
+    genesis: GenesisResult | None
     native_records: list[TrackRecord]
     evaluation: TrackerEvaluation | None = None
 
@@ -238,14 +238,29 @@ def evaluate_forecast_trackers(
     )
     from .evaluation import compare_tracker_ensemble
 
-    genesis, native_records = build_native_tc_track(
-        forecast,
-        lat_min=lat_min,
-        lat_max=lat_max,
-        lon_min=lon_min,
-        lon_max=lon_max,
-        **native_kwargs,
-    )
+    try:
+        genesis, native_records = build_native_tc_track(
+            forecast,
+            lat_min=lat_min,
+            lat_max=lat_max,
+            lon_min=lon_min,
+            lon_max=lon_max,
+            **native_kwargs,
+        )
+    except RuntimeError as exc:
+        no_genesis = (
+            "No tropical cyclone genesis was detected"
+            in str(exc)
+        )
+
+        if (
+            not no_genesis
+            or reference_records is None
+        ):
+            raise
+
+        genesis = None
+        native_records = []
 
     initialization_time = (
         forecast.metadata.initialization_time

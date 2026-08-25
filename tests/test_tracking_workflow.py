@@ -474,3 +474,137 @@ def test_evaluate_forecast_trackers_external_reference(
         result.evaluation.reference_records
         is reference_records
     )
+
+
+def test_evaluate_forecast_trackers_no_native_genesis_with_external_reference(
+    monkeypatch,
+):
+    reference_records = [
+        TrackRecord(
+            lead_time_hours=24,
+            valid_time=np.datetime64(
+                "2026-07-25T00:00:00"
+            ),
+            latitude=15.0,
+            longitude=245.0,
+            pressure=99500.0,
+            pressure_units="Pa",
+            max_wind=25.0,
+            wind_units="m/s",
+        )
+    ]
+
+    def fail_native(
+        *args,
+        **kwargs,
+    ):
+        raise RuntimeError(
+            "No tropical cyclone genesis was detected "
+            "in the selected forecast region."
+        )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow."
+        "build_native_tc_track",
+        fail_native,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.earth2studio."
+        "run_wuduan_tracker",
+        lambda *args, **kwargs: ["wuduan"],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.earth2studio."
+        "run_vitart_tracker",
+        lambda *args, **kwargs: ["vitart"],
+    )
+
+    captured = {}
+
+    def fake_compare(
+        reference,
+        **kwargs,
+    ):
+        captured["reference"] = reference
+        captured["wuduan_tracks"] = (
+            kwargs["wuduan_tracks"]
+        )
+        captured["vitart_tracks"] = (
+            kwargs["vitart_tracks"]
+        )
+
+        return TrackerEvaluation(
+            reference_records=reference,
+            wuduan_match=None,
+            vitart_match=None,
+        )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.evaluation."
+        "compare_tracker_ensemble",
+        fake_compare,
+    )
+
+    forecast = DummyForecast()
+    forecast.dataset = object()
+
+    result = evaluate_forecast_trackers(
+        forecast,
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-150.0,
+        lon_max=-100.0,
+        reference_records=reference_records,
+    )
+
+    assert result.genesis is None
+    assert result.native_records == []
+
+    assert (
+        captured["reference"]
+        is reference_records
+    )
+
+    assert captured[
+        "wuduan_tracks"
+    ] == ["wuduan"]
+
+    assert captured[
+        "vitart_tracks"
+    ] == ["vitart"]
+
+
+def test_evaluate_forecast_trackers_no_native_genesis_without_external_reference(
+    monkeypatch,
+):
+    def fail_native(
+        *args,
+        **kwargs,
+    ):
+        raise RuntimeError(
+            "No tropical cyclone genesis was detected "
+            "in the selected forecast region."
+        )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow."
+        "build_native_tc_track",
+        fail_native,
+    )
+
+    forecast = DummyForecast()
+    forecast.dataset = object()
+
+    with pytest.raises(
+        RuntimeError,
+        match="No tropical cyclone genesis",
+    ):
+        evaluate_forecast_trackers(
+            forecast,
+            lat_min=5.0,
+            lat_max=35.0,
+            lon_min=-150.0,
+            lon_max=-100.0,
+        )
