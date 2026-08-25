@@ -67,9 +67,15 @@ Genevieve/GraphCast is the current four-storm example of this distinction.
 
 Full tracker coverage and paired model coverage are different. Direct GraphCast-AIFS2 differences require common valid times. Always inspect the paired point count before interpreting percentages or mean differences.
 
-## Wave comparison still says `3storm`
+## Stale three-storm wave products
 
-The current generalized single-storm wave scripts support reusable cases, but the existing comparison script/products were created for Elida, Fausto, and Genevieve. After Hernan is validated, update the comparison case list and output names consistently to `4storm`.
+The validated AIFS2 wave comparison now includes Elida, Fausto, Genevieve, and Hernan. Files containing `3storm` are older products and should not be confused with the current `4storm` comparison.
+
+## Peak occurs at final tracker lead time
+
+A storm-relative wind or wave maximum at the final accepted WuDuan lead time is right-censored: the true maximum may occur later, outside the available tracker interval.
+
+The four-storm comparison records boundary flags in the summary CSV and marks affected timing values with an asterisk in the comparison figure. Lag values involving a boundary-limited peak should not be interpreted as fully observed physical response times.
 
 ## Syntax checks before committing
 

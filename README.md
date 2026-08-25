@@ -48,8 +48,7 @@ tropical cyclones:
 | Hernan | 2026-08-11 00 UTC |
 
 The generalized AIFS2 storm-relative wave workflow has been validated
-for Elida, Fausto, and Genevieve. Hernan is the next wave-analysis
-case.
+for Elida, Fausto, Genevieve, and Hernan.
 
 Additional AI weather prediction models will be added incrementally
 after validation against the existing benchmark workflow.
@@ -448,18 +447,16 @@ workflow.
 
 The current Eastern Pacific benchmark includes Elida, Fausto,
 Genevieve, and Hernan. The generalized AIFS2 wave workflow has been
-validated for the first three storms.
+validated for all four storms.
 
 The next development stages are:
 
-1. complete the Hernan AIFS2 wave analysis;
-2. extend the AIFS2 wave comparison from three to four storms;
-3. expand the Eastern Pacific tropical-cyclone sample;
-4. introduce and validate the next AI forecast model;
-5. apply the same tracking, QC, and verification protocol to that model;
-6. expand standardized multi-model and lead-time skill comparisons;
-7. add additional meteorological and intensity diagnostics;
-8. improve experiment, provenance, and automated reporting tools.
+1. expand the Eastern Pacific tropical-cyclone sample;
+2. introduce and validate the next AI forecast model;
+3. apply the same tracking, QC, and verification protocol to that model;
+4. expand standardized multi-model and lead-time skill comparisons;
+5. add additional meteorological and intensity diagnostics;
+6. improve experiment, provenance, and automated reporting tools.
 
 The long-term goal is to provide a reproducible framework in which
 multiple AI weather prediction systems can be evaluated through a

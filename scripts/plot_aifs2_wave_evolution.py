@@ -26,7 +26,7 @@ parser.add_argument(
     required=True,
     help=(
         "Storm key defined in scripts/wave_cases.py "
-        "(for example: elida, fausto, genevieve)."
+        "(for example: elida, fausto, genevieve, hernan)."
     ),
 )
 

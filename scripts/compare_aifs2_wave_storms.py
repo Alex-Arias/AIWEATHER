@@ -44,6 +44,16 @@ STORMS = {
             "aifs2_genevieve_wave_radial_profiles.csv"
         ),
     },
+    "Hernan": {
+        "diagnostics": Path(
+            "results/waves/aifs2_hernan/"
+            "aifs2_hernan_wave_diagnostics.csv"
+        ),
+        "radial": Path(
+            "results/waves/aifs2_hernan/"
+            "aifs2_hernan_wave_radial_profiles.csv"
+        ),
+    },
 }
 
 OUTPUT_DIR = Path(
@@ -151,6 +161,26 @@ for storm in STORMS:
         storm
     ]
 
+    # --------------------------------------------------------
+    # Available storm-relative lead-time boundaries
+    #
+    # A peak at the final available lead time is right-censored:
+    # the true maximum may occur later, outside the accepted
+    # tracker interval.
+    # --------------------------------------------------------
+
+    first_diag_lead = int(
+        diag[
+            "lead_time_hours"
+        ].min()
+    )
+
+    last_diag_lead = int(
+        diag[
+            "lead_time_hours"
+        ].max()
+    )
+
 
     # --------------------------------------------------------
     # Maximum pointwise SWH within 300 km
@@ -176,6 +206,11 @@ for storm in STORMS:
         ]
     )
 
+    swh_peak_at_boundary = (
+        swh_peak_time
+        == last_diag_lead
+    )
+
 
     # --------------------------------------------------------
     # Maximum pointwise wind within 300 km
@@ -199,6 +234,11 @@ for storm in STORMS:
             wind_index,
             "lead_time_hours",
         ]
+    )
+
+    wind_peak_at_boundary = (
+        wind_peak_time
+        == last_diag_lead
     )
 
 
@@ -250,6 +290,17 @@ for storm in STORMS:
         ]
     )
 
+    last_radial_lead = int(
+        ridge[
+            "lead_time_hours"
+        ].max()
+    )
+
+    radial_peak_at_boundary = (
+        radial_peak_time
+        == last_radial_lead
+    )
+
 
     # --------------------------------------------------------
     # Summary
@@ -292,6 +343,21 @@ for storm in STORMS:
 
             "radial_mean_peak_radius_km":
                 radial_peak_radius,
+
+            "first_available_lead_h":
+                first_diag_lead,
+
+            "last_available_lead_h":
+                last_diag_lead,
+
+            "wind_peak_at_boundary":
+                wind_peak_at_boundary,
+
+            "swh_peak_at_boundary":
+                swh_peak_at_boundary,
+
+            "radial_peak_at_boundary":
+                radial_peak_at_boundary,
         }
     )
 
@@ -307,7 +373,7 @@ summary = pd.DataFrame(
 
 summary_path = (
     OUTPUT_DIR
-    / "aifs2_epac_3storm_wave_summary.csv"
+    / "aifs2_epac_4storm_wave_summary.csv"
 )
 
 summary.to_csv(
@@ -470,7 +536,7 @@ x = np.arange(
 width = 0.24
 
 
-ax.bar(
+wind_bars = ax.bar(
     x - width,
     summary[
         "wind_peak_lead_h"
@@ -479,7 +545,7 @@ ax.bar(
     label="Wind peak",
 )
 
-ax.bar(
+swh_bars = ax.bar(
     x,
     summary[
         "swh_peak_lead_h"
@@ -488,7 +554,7 @@ ax.bar(
     label="Pointwise SWH peak",
 )
 
-ax.bar(
+radial_bars = ax.bar(
     x + width,
     summary[
         "radial_mean_peak_lead_h"
@@ -496,6 +562,73 @@ ax.bar(
     width,
     label="Radial-mean SWH peak",
 )
+
+
+# ------------------------------------------------------------
+# Mark peaks that occur at the final available lead time.
+# ------------------------------------------------------------
+
+for index, row in summary.iterrows():
+
+    if bool(
+        row[
+            "wind_peak_at_boundary"
+        ]
+    ):
+        bar = wind_bars[
+            index
+        ]
+
+        ax.text(
+            bar.get_x()
+            + bar.get_width() / 2.0,
+            bar.get_height() + 3.0,
+            "*",
+            ha="center",
+            va="bottom",
+            fontsize=12,
+            fontweight="bold",
+        )
+
+    if bool(
+        row[
+            "swh_peak_at_boundary"
+        ]
+    ):
+        bar = swh_bars[
+            index
+        ]
+
+        ax.text(
+            bar.get_x()
+            + bar.get_width() / 2.0,
+            bar.get_height() + 3.0,
+            "*",
+            ha="center",
+            va="bottom",
+            fontsize=12,
+            fontweight="bold",
+        )
+
+    if bool(
+        row[
+            "radial_peak_at_boundary"
+        ]
+    ):
+        bar = radial_bars[
+            index
+        ]
+
+        ax.text(
+            bar.get_x()
+            + bar.get_width() / 2.0,
+            bar.get_height() + 3.0,
+            "*",
+            ha="center",
+            va="bottom",
+            fontsize=12,
+            fontweight="bold",
+        )
 
 
 ax.set_xticks(
@@ -580,6 +713,50 @@ for index, row in summary.iterrows():
         ]
     )
 
+    point_lag_at_boundary = (
+        bool(
+            row[
+                "wind_peak_at_boundary"
+            ]
+        )
+        or bool(
+            row[
+                "swh_peak_at_boundary"
+            ]
+        )
+    )
+
+    radial_lag_at_boundary = (
+        bool(
+            row[
+                "wind_peak_at_boundary"
+            ]
+        )
+        or bool(
+            row[
+                "radial_peak_at_boundary"
+            ]
+        )
+    )
+
+    point_label = (
+        f"{point_lag:+d} h"
+        + (
+            "*"
+            if point_lag_at_boundary
+            else ""
+        )
+    )
+
+    radial_label = (
+        f"{radial_lag:+d} h"
+        + (
+            "*"
+            if radial_lag_at_boundary
+            else ""
+        )
+    )
+
     ax.text(
         index - width / 2.0,
         point_lag
@@ -588,7 +765,7 @@ for index, row in summary.iterrows():
             if point_lag >= 0
             else -4
         ),
-        f"{point_lag:+d} h",
+        point_label,
         ha="center",
         va=(
             "bottom"
@@ -606,7 +783,7 @@ for index, row in summary.iterrows():
             if radial_lag >= 0
             else -4
         ),
-        f"{radial_lag:+d} h",
+        radial_label,
         ha="center",
         va=(
             "bottom"
@@ -652,15 +829,27 @@ ax.legend(
 
 fig.suptitle(
     "AIFS2 Tropical-Cyclone Wave Comparison\n"
-    "Elida, Fausto, and Genevieve — WuDuan storm-relative diagnostics",
+    "Elida, Fausto, Genevieve, and Hernan — "
+    "WuDuan storm-relative diagnostics",
     fontsize=14,
     fontweight="bold",
+)
+
+fig.text(
+    0.5,
+    0.012,
+    "* Peak occurs at the final available WuDuan lead time; "
+    "timing is right-censored.",
+    ha="center",
+    va="bottom",
+    fontsize=9,
+    fontstyle="italic",
 )
 
 fig.tight_layout(
     rect=[
         0,
-        0,
+        0.035,
         1,
         0.95,
     ]
@@ -673,12 +862,12 @@ fig.tight_layout(
 
 png_path = (
     OUTPUT_DIR
-    / "aifs2_epac_3storm_wave_comparison.png"
+    / "aifs2_epac_4storm_wave_comparison.png"
 )
 
 pdf_path = (
     OUTPUT_DIR
-    / "aifs2_epac_3storm_wave_comparison.pdf"
+    / "aifs2_epac_4storm_wave_comparison.pdf"
 )
 
 

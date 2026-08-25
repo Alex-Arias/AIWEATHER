@@ -28,7 +28,7 @@ parser.add_argument(
     required=True,
     help=(
         "Storm key defined in scripts/wave_cases.py "
-        "(for example: elida, fausto, genevieve)."
+        "(for example: elida, fausto, genevieve, hernan)."
     ),
 )
 
@@ -63,7 +63,7 @@ FORECAST_PATH = Path(
 
 TRACK_POINTS_PATH = Path(
     "results/verification/batch/"
-    "aifs2_epac_3storm/"
+    "aifs2_epac_4storm/"
     "batch_points.csv"
 )
 

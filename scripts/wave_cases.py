@@ -25,6 +25,12 @@ CASES = {
         "init": "20260724T000000",
         "case_id": "genevieve_20260724T000000",
     },
+
+    "hernan": {
+        "storm_name": "Hernan",
+        "init": "20260811T000000",
+        "case_id": "hernan_20260811T000000",
+    },
 }
 
 
