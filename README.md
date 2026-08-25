@@ -18,7 +18,7 @@ AIWeather currently provides an end-to-end tropical cyclone
 verification workflow built around standardized AIWeather forecast
 stores.
 
-The GraphCast workflow has been validated end to end, including:
+The GraphCast and AIFS2 workflows have been validated end to end, including:
 
 - standardized forecast storage;
 - tropical cyclone tracking;
@@ -34,8 +34,40 @@ The GraphCast workflow has been validated end to end, including:
 - run provenance manifests;
 - command-line execution.
 
-Additional AI weather prediction models are planned for the
-multi-model benchmarking layer.
+GraphCast and AIFS2 are currently evaluated through the same
+forecast -> tracking -> QC -> verification framework.
+
+The current controlled Eastern Pacific benchmark includes four
+tropical cyclones:
+
+| Storm | Initialization |
+|---|---|
+| Elida | 2026-07-14 12 UTC |
+| Fausto | 2026-07-19 00 UTC |
+| Genevieve | 2026-07-24 00 UTC |
+| Hernan | 2026-08-11 00 UTC |
+
+The generalized AIFS2 storm-relative wave workflow has been validated
+for Elida, Fausto, and Genevieve. Hernan is the next wave-analysis
+case.
+
+Additional AI weather prediction models will be added incrementally
+after validation against the existing benchmark workflow.
+
+---
+
+## Documentation
+
+Detailed workflow documentation is available in `docs/`:
+
+- [Quick start](docs/quickstart.md)
+- [Running forecast models](docs/forecast_models.md)
+- [HPC workflow](docs/hpc_workflow.md)
+- [Single-storm TC verification](docs/tc_verification.md)
+- [Multi-storm batch verification](docs/batch_verification.md)
+- [GraphCast vs AIFS2 comparison](docs/model_comparison.md)
+- [AIFS2 wave analysis](docs/wave_analysis.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ---
 
@@ -47,7 +79,7 @@ For development, activate the project environment and install the
 package in editable mode:
 
 ```bash
-conda activate aiweather17
+conda activate aiweather17_aifs2
 
 cd /path/to/AIWeather
 
@@ -95,8 +127,9 @@ aiweather verify-tc \
     --lat-max 35 \
     --lon-min -130 \
     --lon-max -90 \
-    --device cuda \
-    --minimum-overlap 3 \
+    --device cpu \
+    --minimum-overlap 6 \
+    --maximum-mean-error-km 450 \
     --plots \
     --field-leads 54 78 96 120
 ```
@@ -106,8 +139,9 @@ In this example:
 - the forecast is initialized at `2026-07-24 00:00 UTC`;
 - `2026204N08267` is the IBTrACS storm identifier;
 - the tracking domain is 5–35°N and 130–90°W;
-- tropical cyclone tracking runs on CUDA;
-- at least three overlapping forecast/best-track points are required;
+- tropical cyclone tracking is run on CPU in this example;
+- at least six overlapping forecast/best-track points are required;
+- tracker candidates with mean reference-track error above 450 km are rejected;
 - the standard verification plots are generated;
 - field diagnostics are generated at forecast lead times 54, 78, 96,
   and 120 hours.
@@ -369,11 +403,11 @@ development environment.
 This is particularly important for dependencies such as Earth2Studio,
 CUDA-related libraries, and AI model packages.
 
-The current development environment used for the validated GraphCast
-workflow is:
+The current development environment used for the validated GraphCast,
+AIFS2, tropical-cyclone verification, and AIFS2 wave workflows is:
 
 ```text
-aiweather17
+aiweather17_aifs2
 ```
 
 Environment specifications should be kept synchronized with stable
@@ -408,22 +442,29 @@ use the same downstream verification framework.
 
 ## Roadmap
 
-The current GraphCast tropical cyclone workflow establishes the
-reference end-to-end implementation.
+GraphCast and AIFS2 now provide validated end-to-end implementations
+of the common AIWeather forecast, tracking, QC, and verification
+workflow.
+
+The current Eastern Pacific benchmark includes Elida, Fausto,
+Genevieve, and Hernan. The generalized AIFS2 wave workflow has been
+validated for the first three storms.
 
 The next development stages are:
 
-1. multi-storm tropical cyclone verification;
-2. aggregate track and intensity skill statistics;
-3. multi-model forecast integration;
-4. standardized cross-model benchmarking;
-5. expanded experiment and provenance management;
-6. additional meteorological verification diagnostics;
-7. automated benchmark reports.
+1. complete the Hernan AIFS2 wave analysis;
+2. extend the AIFS2 wave comparison from three to four storms;
+3. expand the Eastern Pacific tropical-cyclone sample;
+4. introduce and validate the next AI forecast model;
+5. apply the same tracking, QC, and verification protocol to that model;
+6. expand standardized multi-model and lead-time skill comparisons;
+7. add additional meteorological and intensity diagnostics;
+8. improve experiment, provenance, and automated reporting tools.
 
 The long-term goal is to provide a reproducible framework in which
 multiple AI weather prediction systems can be evaluated through a
-common scientific workflow.
+common scientific workflow without changing the verification
+methodology for each model.
 
 ---
 
