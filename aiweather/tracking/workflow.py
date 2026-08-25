@@ -189,8 +189,10 @@ def evaluate_forecast_trackers(
     dataset=None,
     device: str = "cuda",
     minimum_overlap: int = 3,
+    maximum_mean_error_km: float | None = None,
     run_wuduan: bool = True,
     run_vitart: bool = True,
+    reference_records: list[TrackRecord] | None = None,
     **native_kwargs,
 ) -> TrackingWorkflowResult:
     """
@@ -274,12 +276,19 @@ def evaluate_forecast_trackers(
             device=device,
         )
 
+    matching_reference = (
+        native_records
+        if reference_records is None
+        else reference_records
+    )
+
     evaluation = compare_tracker_ensemble(
-        native_records,
+        matching_reference,
         initialization_time=initialization_time,
         wuduan_tracks=wuduan_tracks,
         vitart_tracks=vitart_tracks,
         minimum_overlap=minimum_overlap,
+        maximum_mean_error_km=maximum_mean_error_km,
     )
 
     return TrackingWorkflowResult(

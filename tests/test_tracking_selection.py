@@ -323,3 +323,53 @@ def test_select_matching_track_rejects_invalid_overlap():
             ),
             minimum_overlap=0,
         )
+
+
+
+def test_select_matching_track_rejects_large_mean_error():
+    reference = [
+        make_record(
+            48,
+            18.0,
+            228.0,
+        ),
+        make_record(
+            54,
+            18.2,
+            227.5,
+        ),
+        make_record(
+            60,
+            18.4,
+            227.0,
+        ),
+    ]
+
+    distant = make_earth2studio_track(
+        path_id=0,
+        lead_times=[
+            48,
+            54,
+            60,
+        ],
+        latitudes=[
+            35.0,
+            35.5,
+            36.0,
+        ],
+        longitudes=[
+            150.0,
+            149.5,
+            149.0,
+        ],
+    )
+
+    result = select_matching_track(
+        reference,
+        [distant],
+        initialization_time=INITIALIZATION_TIME,
+        minimum_overlap=3,
+        maximum_mean_error_km=500.0,
+    )
+
+    assert result is None

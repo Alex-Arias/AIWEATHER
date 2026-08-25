@@ -105,6 +105,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
 
     verify_parser.add_argument(
+        "--maximum-mean-error-km",
+        type=float,
+        default=None,
+        help=(
+            "Maximum allowed mean track error in km when "
+            "associating tracker candidates with the "
+            "reference track. Candidates above this "
+            "threshold are rejected."
+        ),
+    )
+
+    verify_parser.add_argument(
         "--minimum-overlap",
         type=int,
         default=1,
@@ -223,6 +235,14 @@ def _validate_verify_tc_args(
             "--lon-max."
         )
 
+    if (
+        args.maximum_mean_error_km is not None
+        and args.maximum_mean_error_km <= 0.0
+    ):
+        raise ValueError(
+            "--maximum-mean-error-km must be positive."
+        )
+
     if args.minimum_overlap < 1:
         raise ValueError(
             "--minimum-overlap must be at least 1."
@@ -270,6 +290,9 @@ def _run_verify_tc(
         device=args.device,
         minimum_overlap=(
             args.minimum_overlap
+        ),
+        maximum_mean_error_km=(
+            args.maximum_mean_error_km
         ),
         output_dir=args.output,
         generate_plots=args.plots,

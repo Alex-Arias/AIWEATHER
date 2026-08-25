@@ -473,6 +473,7 @@ def run_tc_verification_batch(
     *,
     device: str = "cpu",
     minimum_overlap: int = 1,
+    maximum_mean_error_km: float | None = None,
     generate_plots: bool = False,
     field_lead_times: list[
         int | float
@@ -502,6 +503,11 @@ def run_tc_verification_batch(
 
     minimum_overlap
         Minimum overlap required for tracker-path matching.
+
+    maximum_mean_error_km
+        Optional maximum allowed mean track error in km
+        when associating tracker candidates with the
+        reference track.
 
     generate_plots
         Generate standard single-case verification plots.
@@ -544,6 +550,14 @@ def run_tc_verification_batch(
         as valid for aggregation by tracker QC.
     """
 
+    if (
+        maximum_mean_error_km is not None
+        and maximum_mean_error_km <= 0.0
+    ):
+        raise ValueError(
+            "maximum_mean_error_km must be positive."
+        )
+
     if not isinstance(
         cases,
         list,
@@ -580,6 +594,9 @@ def run_tc_verification_batch(
             lon_max=case.lon_max,
             device=device,
             minimum_overlap=minimum_overlap,
+            maximum_mean_error_km=(
+                maximum_mean_error_km
+            ),
             generate_plots=generate_plots,
             field_lead_times=field_lead_times,
             ibtracs_path=ibtracs_path,

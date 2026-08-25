@@ -375,3 +375,102 @@ def test_evaluate_forecast_trackers_native_only(
     assert result.genesis is genesis
     assert result.native_records is native_records
     assert result.evaluation is evaluation
+
+def test_evaluate_forecast_trackers_external_reference(
+    monkeypatch,
+):
+    genesis = GenesisResult(
+        track_index=0,
+        genesis_lead_time_hours=24,
+        latitude=10.0,
+        longitude=250.0,
+        pressure=100000.0,
+        max_wind=20.0,
+        qualifying_points=3,
+    )
+
+    native_records = [
+        TrackRecord(
+            lead_time_hours=24,
+            valid_time=np.datetime64(
+                "2026-07-25T00:00:00"
+            ),
+            latitude=10.0,
+            longitude=250.0,
+            pressure=100000.0,
+            pressure_units="Pa",
+            max_wind=20.0,
+            wind_units="m/s",
+        )
+    ]
+
+    reference_records = [
+        TrackRecord(
+            lead_time_hours=24,
+            valid_time=np.datetime64(
+                "2026-07-25T00:00:00"
+            ),
+            latitude=15.0,
+            longitude=245.0,
+            pressure=99500.0,
+            pressure_units="Pa",
+            max_wind=25.0,
+            wind_units="m/s",
+        )
+    ]
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow.build_native_tc_track",
+        lambda *args, **kwargs: (
+            genesis,
+            native_records,
+        ),
+    )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.earth2studio.run_wuduan_tracker",
+        lambda *args, **kwargs: ["wuduan"],
+    )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.earth2studio.run_vitart_tracker",
+        lambda *args, **kwargs: ["vitart"],
+    )
+
+    captured = {}
+
+    def fake_compare(
+        reference,
+        **kwargs,
+    ):
+        captured["reference"] = reference
+
+        return TrackerEvaluation(
+            reference_records=reference,
+            wuduan_match=None,
+            vitart_match=None,
+        )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.evaluation.compare_tracker_ensemble",
+        fake_compare,
+    )
+
+    forecast = DummyForecast()
+    forecast.dataset = object()
+
+    result = evaluate_forecast_trackers(
+        forecast,
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        reference_records=reference_records,
+    )
+
+    assert captured["reference"] is reference_records
+    assert result.native_records is native_records
+    assert (
+        result.evaluation.reference_records
+        is reference_records
+    )

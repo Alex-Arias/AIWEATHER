@@ -430,6 +430,7 @@ def test_export_verification_manifest(
         lon_max=-90.0,
         device="cuda",
         minimum_overlap=3,
+        maximum_mean_error_km=250.0,
         ibtracs_path=(
             "data/verification/ibtracs/"
             "ibtracs.EP.list.v04r01.csv"
@@ -489,6 +490,12 @@ def test_export_verification_manifest(
     ][
         "minimum_overlap"
     ] == 3
+
+    assert manifest[
+        "verification"
+    ][
+        "maximum_mean_error_km"
+    ] == 250.0
 
     assert manifest[
         "ibtracs"

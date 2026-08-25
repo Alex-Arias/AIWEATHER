@@ -302,3 +302,42 @@ def test_compare_tracker_ensemble_rejects_invalid_reference():
             "invalid",
             initialization_time=INITIALIZATION_TIME,
         )
+
+
+def test_compare_tracker_ensemble_maximum_mean_error():
+    reference = [
+        make_record(48, 18.0, 228.0),
+        make_record(54, 18.2, 227.5),
+        make_record(60, 18.4, 227.0),
+    ]
+
+    vitart_tracks = [
+        make_track(
+            8,
+            [48, 54, 60],
+            [35.0, 35.5, 36.0],
+            [150.0, 149.5, 149.0],
+        ),
+    ]
+
+    evaluation = compare_tracker_ensemble(
+        reference,
+        initialization_time=INITIALIZATION_TIME,
+        vitart_tracks=vitart_tracks,
+        minimum_overlap=3,
+        maximum_mean_error_km=500.0,
+    )
+
+    assert evaluation.vitart_match is None
+
+
+def test_compare_tracker_ensemble_rejects_invalid_maximum_error():
+    with pytest.raises(
+        ValueError,
+        match="maximum_mean_error_km",
+    ):
+        compare_tracker_ensemble(
+            [],
+            initialization_time=INITIALIZATION_TIME,
+            maximum_mean_error_km=0.0,
+        )

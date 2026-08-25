@@ -70,6 +70,7 @@ def compare_tracker_ensemble(
     wuduan_tracks: list[Earth2StudioTrack] | None = None,
     vitart_tracks: list[Earth2StudioTrack] | None = None,
     minimum_overlap: int = 1,
+    maximum_mean_error_km: float | None = None,
 ) -> TrackerEvaluation:
     """
     Compare Earth2Studio tracker ensembles with a reference track.
@@ -134,6 +135,15 @@ def compare_tracker_ensemble(
         )
 
     if (
+        maximum_mean_error_km is not None
+        and maximum_mean_error_km <= 0.0
+    ):
+        raise ValueError(
+            "maximum_mean_error_km must be "
+            "positive or None."
+        )
+
+    if (
         wuduan_tracks is not None
         and not isinstance(
             wuduan_tracks,
@@ -163,6 +173,7 @@ def compare_tracker_ensemble(
             wuduan_tracks,
             initialization_time=initialization_time,
             minimum_overlap=minimum_overlap,
+            maximum_mean_error_km=maximum_mean_error_km,
             reference_name="aiweather",
             candidate_name="wuduan",
         )
@@ -175,6 +186,7 @@ def compare_tracker_ensemble(
             vitart_tracks,
             initialization_time=initialization_time,
             minimum_overlap=minimum_overlap,
+            maximum_mean_error_km=maximum_mean_error_km,
             reference_name="aiweather",
             candidate_name="vitart",
         )

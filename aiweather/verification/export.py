@@ -75,6 +75,7 @@ def export_verification_manifest(
     lon_max: float,
     device: str,
     minimum_overlap: int,
+    maximum_mean_error_km: float | None = None,
     ibtracs_path: str | Path,
     ibtracs_basin: str,
     generate_plots: bool,
@@ -162,6 +163,14 @@ def export_verification_manifest(
             "device": device,
             "minimum_overlap": int(
                 minimum_overlap
+            ),
+            "maximum_mean_error_km": (
+                float(
+                    maximum_mean_error_km
+                )
+                if maximum_mean_error_km
+                is not None
+                else None
             ),
         },
         "ibtracs": {

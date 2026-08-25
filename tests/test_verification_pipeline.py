@@ -237,9 +237,27 @@ def test_run_tc_verification_pipeline(
         "forecast.zarr",
     )
 
-    assert calls[1][0] == "evaluate"
+    assert calls[1] == (
+        "read_ibtracs",
+        Path("ibtracs.csv"),
+        "2026204N08267",
+    )
 
-    evaluate_kwargs = calls[1][2]
+    assert calls[2][0] == (
+        "best_track_to_records"
+    )
+
+    assert calls[2][2] == datetime(
+        2026,
+        7,
+        24,
+        0,
+        0,
+    )
+
+    assert calls[3][0] == "evaluate"
+
+    evaluate_kwargs = calls[3][2]
 
     assert evaluate_kwargs == {
         "lat_min": 5.0,
@@ -248,25 +266,11 @@ def test_run_tc_verification_pipeline(
         "lon_max": -90.0,
         "device": "cuda",
         "minimum_overlap": 3,
+        "maximum_mean_error_km": None,
+        "reference_records": [
+            "best-track-record",
+        ],
     }
-
-    assert calls[2] == (
-        "read_ibtracs",
-        Path("ibtracs.csv"),
-        "2026204N08267",
-    )
-
-    assert calls[3][0] == (
-        "best_track_to_records"
-    )
-
-    assert calls[3][2] == datetime(
-        2026,
-        7,
-        24,
-        0,
-        0,
-    )
 
     assert calls[4][0] == "verify"
 

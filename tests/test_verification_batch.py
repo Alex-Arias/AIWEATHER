@@ -169,6 +169,7 @@ def test_run_tc_verification_batch_single_case(
         ],
         device="cuda",
         minimum_overlap=3,
+        maximum_mean_error_km=250.0,
         generate_plots=True,
         field_lead_times=[
             54,
@@ -218,6 +219,7 @@ def test_run_tc_verification_batch_single_case(
         "lon_max": case.lon_max,
         "device": "cuda",
         "minimum_overlap": 3,
+        "maximum_mean_error_km": 250.0,
         "generate_plots": True,
         "field_lead_times": [
             54,
@@ -1557,3 +1559,16 @@ def test_batch_result_contains_lead_time(
     assert first[
         "point_count"
     ] == 4
+
+
+def test_run_tc_verification_batch_rejects_nonpositive_maximum_mean_error():
+    with pytest.raises(
+        ValueError,
+        match="maximum_mean_error_km must be positive",
+    ):
+        run_tc_verification_batch(
+            [
+                make_case(),
+            ],
+            maximum_mean_error_km=0.0,
+        )

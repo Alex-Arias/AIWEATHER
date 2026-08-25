@@ -527,6 +527,7 @@ def run_tc_verification_pipeline(
     ibtracs_path: str | Path | None = None,
     device: str = "cpu",
     minimum_overlap: int = 1,
+    maximum_mean_error_km: float | None = None,
     output_dir: str | Path | None = None,
     generate_plots: bool = False,
     plot_output_dir: str | Path | None = None,
@@ -619,6 +620,14 @@ def run_tc_verification_pipeline(
     if minimum_overlap < 1:
         raise ValueError(
             "minimum_overlap must be at least 1."
+        )
+
+    if (
+        maximum_mean_error_km is not None
+        and maximum_mean_error_km <= 0.0
+    ):
+        raise ValueError(
+            "maximum_mean_error_km must be positive."
         )
 
     if not isinstance(
@@ -753,20 +762,6 @@ def run_tc_verification_pipeline(
         )
 
     # ---------------------------------------------------------
-    # Run trackers
-    # ---------------------------------------------------------
-
-    tracking = evaluate_forecast_trackers(
-        forecast,
-        lat_min=lat_min,
-        lat_max=lat_max,
-        lon_min=lon_min,
-        lon_max=lon_max,
-        device=device,
-        minimum_overlap=minimum_overlap,
-    )
-
-    # ---------------------------------------------------------
     # Resolve IBTrACS dataset
     # ---------------------------------------------------------
 
@@ -803,6 +798,22 @@ def run_tc_verification_pipeline(
     )
 
     # ---------------------------------------------------------
+    # Run trackers
+    # ---------------------------------------------------------
+
+    tracking = evaluate_forecast_trackers(
+        forecast,
+        lat_min=lat_min,
+        lat_max=lat_max,
+        lon_min=lon_min,
+        lon_max=lon_max,
+        device=device,
+        minimum_overlap=minimum_overlap,
+        maximum_mean_error_km=maximum_mean_error_km,
+        reference_records=best_track_records,
+    )
+
+    # ---------------------------------------------------------
     # Verify tracker output
     # ---------------------------------------------------------
 
@@ -833,6 +844,9 @@ def run_tc_verification_pipeline(
         lon_max=lon_max,
         device=device,
         minimum_overlap=minimum_overlap,
+        maximum_mean_error_km=(
+            maximum_mean_error_km
+        ),
         ibtracs_path=resolved_ibtracs_path,
         ibtracs_basin=ibtracs_basin,
         generate_plots=generate_plots,

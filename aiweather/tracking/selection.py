@@ -52,6 +52,7 @@ def select_matching_track(
     *,
     initialization_time,
     minimum_overlap: int = 1,
+    maximum_mean_error_km: float | None = None,
     reference_name: str = "reference",
     candidate_name: str = "candidate",
 ) -> TrackMatch | None:
@@ -123,6 +124,15 @@ def select_matching_track(
             "minimum_overlap must be at least 1."
         )
 
+    if (
+        maximum_mean_error_km is not None
+        and maximum_mean_error_km <= 0.0
+    ):
+        raise ValueError(
+            "maximum_mean_error_km must be "
+            "positive or None."
+        )
+
     best_match = None
 
     for candidate in candidate_tracks:
@@ -154,6 +164,13 @@ def select_matching_track(
         if (
             comparison.overlap_count
             < minimum_overlap
+        ):
+            continue
+
+        if (
+            maximum_mean_error_km is not None
+            and comparison.mean_track_error_km
+            > maximum_mean_error_km
         ):
             continue
 
