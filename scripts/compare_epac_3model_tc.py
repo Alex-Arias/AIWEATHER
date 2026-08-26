@@ -699,6 +699,53 @@ def append_summary(
             ).mean()
         )
 
+        pressure_error_hpa = (
+            subset[
+                f"pressure_error_pa_{model}"
+            ]
+            / 100.0
+        )
+
+        wind_error = subset[
+            f"wind_error_ms_{model}"
+        ]
+
+        row[
+            f"{model}_pressure_bias_hpa"
+        ] = float(
+            pressure_error_hpa.mean()
+        )
+
+        row[
+            f"{model}_pressure_mae_hpa"
+        ] = float(
+            pressure_error_hpa.abs().mean()
+        )
+
+        row[
+            f"{model}_pressure_rmse_hpa"
+        ] = rmse(
+            pressure_error_hpa
+        )
+
+        row[
+            f"{model}_wind_bias_ms"
+        ] = float(
+            wind_error.mean()
+        )
+
+        row[
+            f"{model}_wind_mae_ms"
+        ] = float(
+            wind_error.abs().mean()
+        )
+
+        row[
+            f"{model}_wind_rmse_ms"
+        ] = rmse(
+            wind_error
+        )
+
     row[
         "mean_graphcast_minus_aifs2_km"
     ] = float(
@@ -1151,11 +1198,17 @@ error_png, error_pdf = save_figure(
 # Storm-level mean track error
 # ============================================================
 
+storm_case_ids = [
+    case_id
+    for case_id, _ in STORMS
+]
+
 storm_summary = summary[
     summary[
         "case_id"
-    ]
-    != "all_common"
+    ].isin(
+        storm_case_ids
+    )
 ].copy()
 
 x = np.arange(
@@ -1234,6 +1287,277 @@ summary_png, summary_pdf = save_figure(
 
 
 # ============================================================
+# FIGURE 4
+# Pressure error versus lead time
+# ============================================================
+
+fig, axes = plt.subplots(
+    1,
+    4,
+    figsize=(
+        20,
+        5.5,
+    ),
+    sharey=True,
+)
+
+for ax, (
+    case_id,
+    storm_name,
+) in zip(
+    axes,
+    STORMS,
+):
+
+    subset = common[
+        common[
+            "case_id"
+        ]
+        == case_id
+    ].sort_values(
+        "lead_time_hours"
+    )
+
+    if subset.empty:
+
+        ax.text(
+            0.5,
+            0.5,
+            "No three-model\ncommon times",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+        )
+
+    else:
+
+        for model in [
+            "graphcast",
+            "aifs2",
+            "pangu3",
+        ]:
+
+            pressure_error_hpa = (
+                subset[
+                    f"pressure_error_pa_{model}"
+                ]
+                / 100.0
+            )
+
+            ax.plot(
+                subset[
+                    "lead_time_hours"
+                ],
+                pressure_error_hpa,
+                marker=markers[
+                    model
+                ],
+                markersize=4,
+                linewidth=2,
+                label=MODEL_LABELS[
+                    model
+                ],
+            )
+
+    ax.axhline(
+        0.0,
+        linewidth=1.0,
+    )
+
+    ax.set_title(
+        storm_name,
+        fontweight="bold",
+    )
+
+    ax.set_xlabel(
+        "Forecast lead time (h)"
+    )
+
+    ax.set_xlim(
+        0,
+        240,
+    )
+
+    ax.set_xticks(
+        LEAD_TICKS
+    )
+
+    ax.tick_params(
+        axis="x",
+        rotation=45,
+    )
+
+    ax.grid(
+        True,
+        alpha=0.3,
+    )
+
+
+axes[0].set_ylabel(
+    "Central-pressure error (hPa)"
+)
+
+axes[0].legend(
+    loc="best",
+    fontsize=8,
+)
+
+fig.suptitle(
+    "Three-Model Tropical Cyclone Pressure Error\n"
+    "Forecast minus IBTrACS — WuDuan Exact Common Times",
+    fontsize=14,
+    fontweight="bold",
+)
+
+fig.tight_layout(
+    rect=[
+        0,
+        0,
+        1,
+        0.91,
+    ]
+)
+
+pressure_png, pressure_pdf = save_figure(
+    fig,
+    "epac_3model_pressure_error_by_storm",
+)
+
+
+# ============================================================
+# FIGURE 5
+# Wind error versus lead time
+# ============================================================
+
+fig, axes = plt.subplots(
+    1,
+    4,
+    figsize=(
+        20,
+        5.5,
+    ),
+    sharey=True,
+)
+
+for ax, (
+    case_id,
+    storm_name,
+) in zip(
+    axes,
+    STORMS,
+):
+
+    subset = common[
+        common[
+            "case_id"
+        ]
+        == case_id
+    ].sort_values(
+        "lead_time_hours"
+    )
+
+    if subset.empty:
+
+        ax.text(
+            0.5,
+            0.5,
+            "No three-model\ncommon times",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+        )
+
+    else:
+
+        for model in [
+            "graphcast",
+            "aifs2",
+            "pangu3",
+        ]:
+
+            ax.plot(
+                subset[
+                    "lead_time_hours"
+                ],
+                subset[
+                    f"wind_error_ms_{model}"
+                ],
+                marker=markers[
+                    model
+                ],
+                markersize=4,
+                linewidth=2,
+                label=MODEL_LABELS[
+                    model
+                ],
+            )
+
+    ax.axhline(
+        0.0,
+        linewidth=1.0,
+    )
+
+    ax.set_title(
+        storm_name,
+        fontweight="bold",
+    )
+
+    ax.set_xlabel(
+        "Forecast lead time (h)"
+    )
+
+    ax.set_xlim(
+        0,
+        240,
+    )
+
+    ax.set_xticks(
+        LEAD_TICKS
+    )
+
+    ax.tick_params(
+        axis="x",
+        rotation=45,
+    )
+
+    ax.grid(
+        True,
+        alpha=0.3,
+    )
+
+
+axes[0].set_ylabel(
+    "Maximum-wind error (m/s)"
+)
+
+axes[0].legend(
+    loc="best",
+    fontsize=8,
+)
+
+fig.suptitle(
+    "Three-Model Tropical Cyclone Wind Error\n"
+    "Forecast minus IBTrACS — WuDuan Exact Common Times",
+    fontsize=14,
+    fontweight="bold",
+)
+
+fig.tight_layout(
+    rect=[
+        0,
+        0,
+        1,
+        0.91,
+    ]
+)
+
+wind_png, wind_pdf = save_figure(
+    fig,
+    "epac_3model_wind_error_by_storm",
+)
+
+
+# ============================================================
 # Console summary
 # ============================================================
 
@@ -1290,6 +1614,93 @@ print(
 
 print()
 print("=" * 92)
+print("ROBUST INTENSITY BENCHMARK")
+print("=" * 92)
+print()
+
+robust_row = summary[
+    summary[
+        "case_id"
+    ]
+    == "robust_common"
+].iloc[0]
+
+intensity_rows = []
+
+for model in [
+    "graphcast",
+    "aifs2",
+    "pangu3",
+]:
+
+    intensity_rows.append(
+        {
+            "Model":
+                MODEL_LABELS[
+                    model
+                ],
+
+            "P Bias (hPa)":
+                robust_row[
+                    f"{model}_pressure_bias_hpa"
+                ],
+
+            "P MAE (hPa)":
+                robust_row[
+                    f"{model}_pressure_mae_hpa"
+                ],
+
+            "P RMSE (hPa)":
+                robust_row[
+                    f"{model}_pressure_rmse_hpa"
+                ],
+
+            "W Bias (m/s)":
+                robust_row[
+                    f"{model}_wind_bias_ms"
+                ],
+
+            "W MAE (m/s)":
+                robust_row[
+                    f"{model}_wind_mae_ms"
+                ],
+
+            "W RMSE (m/s)":
+                robust_row[
+                    f"{model}_wind_rmse_ms"
+                ],
+        }
+    )
+
+intensity_display = pd.DataFrame(
+    intensity_rows
+)
+
+print(
+    intensity_display.to_string(
+        index=False,
+        float_format=lambda x:
+            f"{x:.2f}",
+    )
+)
+
+print()
+print(
+    "Robust sample:",
+    int(
+        robust_row[
+            "common_points"
+        ]
+    ),
+    "exact common points from",
+    len(
+        eligible_cases
+    ),
+    "eligible storms.",
+)
+
+print()
+print("=" * 92)
 print("COVERAGE")
 print("=" * 92)
 print()
@@ -1334,6 +1745,16 @@ print(
 print(
     "Mean-error summary:",
     summary_png,
+)
+
+print(
+    "Pressure errors:",
+    pressure_png,
+)
+
+print(
+    "Wind errors:",
+    wind_png,
 )
 
 print(
