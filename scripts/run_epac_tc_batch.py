@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Run the four-storm eastern Pacific tropical-cyclone
+Run the five-storm eastern Pacific tropical-cyclone
 verification batch for GraphCast, AIFS2, or Pangu3.
 
 Storms
 ------
+Douglas
 Elida
 Fausto
 Genevieve
@@ -37,6 +38,17 @@ FIELD_LEAD_TIMES = [
 
 
 STORMS = [
+
+    {
+        "case_id": "douglas_20260701T000000",
+        "sid": "2026180N11238",
+        "init": "20260701T000000",
+        "lat_min": 5.0,
+        "lat_max": 30.0,
+        "lon_min": -145.0,
+        "lon_max": -110.0,
+    },
+
     {
         "case_id": "elida_20260714T120000",
         "sid": "2026194N12265",
@@ -80,7 +92,7 @@ def build_cases(
     model: str,
 ) -> list[TCVerificationCase]:
     """
-    Construct the standard four-storm EPAC batch.
+    Construct the standard five-storm EPAC batch.
     """
 
     cases = []
@@ -109,7 +121,7 @@ def build_cases(
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the four-storm EPAC tropical-cyclone "
+            "Run the five-storm EPAC tropical-cyclone "
             "verification batch."
         )
     )
@@ -153,12 +165,12 @@ def main() -> None:
         Path("results")
         / "verification"
         / "batch"
-        / f"{model}_epac_4storm"
+        / f"{model}_epac_5storm"
     )
 
     print("=" * 76)
     print(
-        f"{model.upper()} — EPAC FOUR-STORM "
+        f"{model.upper()} — EPAC FIVE-STORM "
         "TC VERIFICATION"
     )
     print("=" * 76)

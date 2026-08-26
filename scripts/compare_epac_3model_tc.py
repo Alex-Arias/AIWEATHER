@@ -38,17 +38,17 @@ MINIMUM_COMMON_POINTS = 6
 MODEL_PATHS = {
     "graphcast": Path(
         "results/verification/batch/"
-        "graphcast_epac_4storm/"
+        "graphcast_epac_5storm/"
         "batch_points.csv"
     ),
     "aifs2": Path(
         "results/verification/batch/"
-        "aifs2_epac_4storm/"
+        "aifs2_epac_5storm/"
         "batch_points.csv"
     ),
     "pangu3": Path(
         "results/verification/batch/"
-        "pangu3_epac_4storm/"
+        "pangu3_epac_5storm/"
         "batch_points.csv"
     ),
 }
@@ -60,6 +60,11 @@ MODEL_LABELS = {
 }
 
 STORMS = [
+
+    (
+        "douglas_20260701T000000",
+        "Douglas",
+    ),
     (
         "elida_20260714T120000",
         "Elida",
@@ -83,7 +88,7 @@ COVERAGE = "full"
 
 OUTPUT_DIR = Path(
     "results/verification/comparison/"
-    "epac_3model_4storm"
+    "epac_3model_5storm"
 )
 
 OUTPUT_DIR.mkdir(
@@ -933,14 +938,18 @@ coverage.to_csv(
 # ============================================================
 
 fig, axes = plt.subplots(
-    1,
-    4,
+    2,
+    3,
     figsize=(
-        20,
-        5.5,
+        18,
+        10,
     ),
     sharey=True,
 )
+
+axes = np.asarray(
+    axes
+).ravel()
 
 markers = {
     "graphcast": "s",
@@ -1030,8 +1039,14 @@ for ax, (
         alpha=0.3,
     )
 
+for ax in axes[
+    len(STORMS):
+]:
+    ax.set_visible(
+        False
+    )
 
-axes[0].set_ylabel(
+fig.supylabel(
     "Latitude (°)"
 )
 
@@ -1069,14 +1084,18 @@ tracks_png, tracks_pdf = save_figure(
 # ============================================================
 
 fig, axes = plt.subplots(
-    1,
-    4,
+    2,
+    3,
     figsize=(
-        20,
-        5.5,
+        18,
+        10,
     ),
     sharey=True,
 )
+
+axes = np.asarray(
+    axes
+).ravel()
 
 for ax, (
     case_id,
@@ -1161,8 +1180,14 @@ for ax, (
         alpha=0.3,
     )
 
+for ax in axes[
+    len(STORMS):
+]:
+    ax.set_visible(
+        False
+    )
 
-axes[0].set_ylabel(
+fig.supylabel(
     "Track error (km)"
 )
 
@@ -1292,14 +1317,18 @@ summary_png, summary_pdf = save_figure(
 # ============================================================
 
 fig, axes = plt.subplots(
-    1,
-    4,
+    2,
+    3,
     figsize=(
-        20,
-        5.5,
+        18,
+        10,
     ),
     sharey=True,
 )
+
+axes = np.asarray(
+    axes
+).ravel()
 
 for ax, (
     case_id,
@@ -1392,8 +1421,14 @@ for ax, (
         alpha=0.3,
     )
 
+for ax in axes[
+    len(STORMS):
+]:
+    ax.set_visible(
+        False
+    )
 
-axes[0].set_ylabel(
+fig.supylabel(
     "Central-pressure error (hPa)"
 )
 
@@ -1430,14 +1465,18 @@ pressure_png, pressure_pdf = save_figure(
 # ============================================================
 
 fig, axes = plt.subplots(
-    1,
-    4,
+    2,
+    3,
     figsize=(
-        20,
-        5.5,
+        18,
+        10,
     ),
     sharey=True,
 )
+
+axes = np.asarray(
+    axes
+).ravel()
 
 for ax, (
     case_id,
@@ -1525,8 +1564,14 @@ for ax, (
         alpha=0.3,
     )
 
+for ax in axes[
+    len(STORMS):
+]:
+    ax.set_visible(
+        False
+    )
 
-axes[0].set_ylabel(
+fig.supylabel(
     "Maximum-wind error (m/s)"
 )
 

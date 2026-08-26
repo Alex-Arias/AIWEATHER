@@ -14,7 +14,7 @@ Input
 Strict three-model exact-common-time table:
 
     results/verification/comparison/
-    epac_3model_4storm/
+    epac_3model_5storm/
     epac_3model_common_points.csv
 
 The analysis is performed on the robust sample:
@@ -53,13 +53,13 @@ import pandas as pd
 
 INPUT_PATH = Path(
     "results/verification/comparison/"
-    "epac_3model_4storm/"
+    "epac_3model_5storm/"
     "epac_3model_common_points.csv"
 )
 
 OUTPUT_DIR = Path(
     "results/verification/comparison/"
-    "epac_3model_4storm"
+    "epac_3model_5storm"
 )
 
 OUTPUT_DIR.mkdir(
