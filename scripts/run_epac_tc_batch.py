@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Run the four-storm eastern Pacific tropical-cyclone
-verification batch for GraphCast or AIFS2.
+verification batch for GraphCast, AIFS2, or Pangu3.
 
 Storms
 ------
@@ -119,6 +119,7 @@ def main() -> None:
         choices=[
             "aifs2",
             "graphcast",
+            "pangu3",
         ],
         help="Forecast model to verify.",
     )

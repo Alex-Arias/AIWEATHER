@@ -18,6 +18,10 @@ _DATASOURCE_REGISTRY = {
         "name": "gfs",
         "class": GFS,
     },
+    "pangu3": {
+        "name": "gfs",
+        "class": GFS,
+    },
     "aifs2": {
         "name": "ifs",
         "class": IFS,

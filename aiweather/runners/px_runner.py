@@ -84,6 +84,17 @@ class PXRunner(BaseRunner):
             "Running deterministic forecast..."
         )
 
+        if (
+            request.lead_time
+            % self.MODEL_TIMESTEP
+            != 0
+        ):
+            raise ValueError(
+                f"{self.MODEL_NAME} requires lead_time "
+                f"to be divisible by "
+                f"{self.MODEL_TIMESTEP} hours."
+            )
+
         run_forecast(
             time=request.init_time,
             nsteps=(
