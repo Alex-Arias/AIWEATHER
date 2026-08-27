@@ -120,6 +120,16 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--datasource-source",
+        default=None,
+        help=(
+            "Optional datasource backend or mirror, "
+            "for example aws, azure, or ecmwf. "
+            "If omitted, use the datasource default."
+        ),
+    )
+
+    parser.add_argument(
         "--lead-time",
         type=int,
         default=240,
@@ -173,6 +183,7 @@ def main() -> None:
     request = ForecastRequest(
         model=args.model,
         datasource=args.datasource,
+        datasource_source=args.datasource_source,
         init_time=request_time,
         lead_time=args.lead_time,
         output_path=str(
@@ -199,6 +210,14 @@ def main() -> None:
     print(
         "Datasource          :",
         request.datasource,
+    )
+    print(
+        "Datasource source   :",
+        (
+            request.datasource_source
+            if request.datasource_source is not None
+            else "default"
+        ),
     )
     print(
         "Initialization      :",

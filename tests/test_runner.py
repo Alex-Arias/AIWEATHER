@@ -298,3 +298,111 @@ def test_pangu3_rejects_non_divisible_lead_time(
         runner.run_forecast(
             request
         )
+
+
+def test_runner_passes_datasource_source(
+    monkeypatch,
+):
+    """
+    Verify that an explicit datasource source is passed
+    through the PX runner to the datasource loader.
+    """
+
+    import aiweather.backends.earth2studio as backend
+
+    captured = {}
+    fake_data = object()
+
+    def fake_load_data_source(
+        model_name,
+        *,
+        datasource,
+        source=None,
+    ):
+        captured["model_name"] = model_name
+        captured["datasource"] = datasource
+        captured["source"] = source
+        return fake_data
+
+    monkeypatch.setattr(
+        backend,
+        "load_data_source",
+        fake_load_data_source,
+    )
+
+    request = ForecastRequest(
+        model="aifs2",
+        datasource="ifs",
+        datasource_source="azure",
+        init_time="2026-06-29T00:00:00",
+        lead_time=240,
+        device="cpu",
+    )
+
+    runner = create_runner(
+        request.model
+    )
+
+    runner.load_data(
+        request
+    )
+
+    assert captured == {
+        "model_name": "aifs2",
+        "datasource": "ifs",
+        "source": "azure",
+    }
+
+    assert runner.data is fake_data
+
+
+def test_runner_datasource_source_defaults_to_none(
+    monkeypatch,
+):
+    """
+    Verify that omitting datasource_source preserves the
+    datasource implementation's default source behavior.
+    """
+
+    import aiweather.backends.earth2studio as backend
+
+    captured = {}
+
+    def fake_load_data_source(
+        model_name,
+        *,
+        datasource,
+        source=None,
+    ):
+        captured["model_name"] = model_name
+        captured["datasource"] = datasource
+        captured["source"] = source
+        return object()
+
+    monkeypatch.setattr(
+        backend,
+        "load_data_source",
+        fake_load_data_source,
+    )
+
+    request = ForecastRequest(
+        model="aifs2",
+        datasource="ifs",
+        init_time="2026-06-29T00:00:00",
+        lead_time=240,
+        device="cpu",
+    )
+
+    runner = create_runner(
+        request.model
+    )
+
+    runner.load_data(
+        request
+    )
+
+    assert captured == {
+        "model_name": "aifs2",
+        "datasource": "ifs",
+        "source": None,
+    }
