@@ -18,7 +18,7 @@ AIWeather currently provides an end-to-end tropical cyclone
 verification workflow built around standardized AIWeather forecast
 stores.
 
-The GraphCast, AIFS2, and Pangu3 workflows have been validated end to end, including:
+The GraphCast, AIFS2, Pangu3, and Pangu6 workflows have been validated end to end, including:
 
 - standardized forecast storage;
 - tropical cyclone tracking;
@@ -34,7 +34,7 @@ The GraphCast, AIFS2, and Pangu3 workflows have been validated end to end, inclu
 - run provenance manifests;
 - command-line execution.
 
-GraphCast, AIFS2, and Pangu3 are currently evaluated through the same
+GraphCast, AIFS2, Pangu3, and Pangu6 are currently evaluated through the same
 forecast -> tracking -> QC -> verification framework.
 
 The current controlled Eastern Pacific benchmark includes four
@@ -155,6 +155,19 @@ python scripts/run_aiweather_forecast.py \
     --lead-time 240 \
     --device cuda
 ```
+
+Pangu6:
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    pangu6 \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
+```
+
+Pangu3 provides 3-hour output, while Pangu6 provides 6-hour output. Under the Earth2Studio hierarchical Pangu implementation, they share the same 6-hour and 24-hour forecast trajectory at common valid times; Pangu3 adds the intermediate 3-hour states.
 
 See [Running forecast models](docs/forecast_models.md) for details.
 
@@ -457,11 +470,11 @@ development environment.
 This is particularly important for dependencies such as Earth2Studio,
 CUDA-related libraries, and AI model packages.
 
-The current development environment used for the validated GraphCast,
-AIFS2, tropical-cyclone verification, and AIFS2 wave workflows is:
+The current combined development environment used for the validated GraphCast,
+AIFS2, Pangu3, Pangu6, tropical-cyclone verification, and AIFS2 wave workflows is:
 
 ```text
-aiweather17_aifs2
+aiweather17_pangu3
 ```
 
 Environment specifications should be kept synchronized with stable
@@ -496,7 +509,7 @@ use the same downstream verification framework.
 
 ## Roadmap
 
-GraphCast and AIFS2 now provide validated end-to-end implementations
+GraphCast, AIFS2, Pangu3, and Pangu6 now provide validated end-to-end implementations
 of the common AIWeather forecast, tracking, QC, and verification
 workflow.
 

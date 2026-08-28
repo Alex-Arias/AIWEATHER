@@ -13,6 +13,15 @@ Pangu3 / Fausto:
         --lead-time 240 \
         --device cuda
 
+Pangu6 / Genevieve:
+
+    python scripts/run_aiweather_forecast.py \
+        pangu6 \
+        20260724T000000 \
+        --datasource gfs \
+        --lead-time 240 \
+        --device cuda
+
 GraphCast example:
 
     python scripts/run_aiweather_forecast.py \
@@ -98,7 +107,7 @@ def main() -> None:
         "model",
         help=(
             "AIWeather model name, for example "
-            "graphcast or pangu3."
+            "graphcast, aifs2, pangu3, or pangu6."
         ),
     )
 

@@ -63,6 +63,17 @@ python scripts/run_aiweather_forecast.py \
     --device cuda
 ```
 
+Pangu6:
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    pangu6 \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
+```
+
 Forecast products are standardized as:
 
 ```text
@@ -75,6 +86,7 @@ For this example:
 outputs/graphcast/20260724T000000/forecast.zarr
 outputs/aifs2/20260724T000000/forecast.zarr
 outputs/pangu3/20260724T000000/forecast.zarr
+outputs/pangu6/20260724T000000/forecast.zarr
 ```
 
 

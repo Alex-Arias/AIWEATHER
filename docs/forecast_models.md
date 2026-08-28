@@ -12,6 +12,7 @@ The current deterministic forecast workflow supports:
 - GraphCast
 - AIFS2
 - Pangu3
+- Pangu6
 
 The preferred forecast entry point is:
 
@@ -27,7 +28,9 @@ outputs/
 │   └── <initialization>/forecast.zarr
 ├── aifs2/
 │   └── <initialization>/forecast.zarr
-└── pangu3/
+├── pangu3/
+│   └── <initialization>/forecast.zarr
+└── pangu6/
     └── <initialization>/forecast.zarr
 ```
 
@@ -114,13 +117,32 @@ Expected output:
 outputs/pangu3/20260724T000000/forecast.zarr
 ```
 
-Pangu3 may provide a different native output interval from GraphCast and
-AIFS2. Downstream workflows should use the timestamps stored in the
-forecast rather than assuming a fixed cadence.
+Pangu3 uses a 3-hour output cadence.
+
+### Pangu6
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    pangu6 \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
+```
+
+Expected output:
+
+```text
+outputs/pangu6/20260724T000000/forecast.zarr
+```
+
+Pangu6 uses a 6-hour output cadence. Earth2Studio implements Pangu3 and Pangu6 hierarchically: they share the same 6-hour and 24-hour forecast trajectory at common valid times, while Pangu3 adds intermediate 3-hour states.
+
+Downstream workflows should always use the timestamps stored in the forecast rather than assuming a fixed cadence.
 
 ## Environment
 
-The current combined GraphCast/AIFS2/Pangu3 development environment is:
+The current combined GraphCast/AIFS2/Pangu3/Pangu6 development environment is:
 
 ```bash
 conda activate aiweather17_pangu3
@@ -135,7 +157,7 @@ Before tropical-cyclone verification, confirm that the expected stores
 exist:
 
 ```bash
-for model in graphcast aifs2 pangu3; do
+for model in graphcast aifs2 pangu3 pangu6; do
     test -d outputs/${model}/20260724T000000/forecast.zarr \
         && echo "${model}: OK" \
         || echo "${model}: MISSING"
