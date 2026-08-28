@@ -6,7 +6,7 @@ This page gives the shortest end-to-end AIWeather workflow.
 
 ```bash
 cd /LUSTRE/ariasv/AIWeather
-conda activate aiweather17_aifs2
+conda activate aiweather17_pangu3
 ```
 
 ## 2. Check the installation
@@ -24,18 +24,59 @@ python -m pip install -e .
 
 ## 3. Generate forecasts
 
-Use the model-specific forecast scripts/configuration described in [forecast_models.md](forecast_models.md). Forecast products are standardized as:
+Use the unified forecast launcher described in
+[forecast_models.md](forecast_models.md).
+
+Example: Genevieve initialized at `2026-07-24 00 UTC`.
+
+GraphCast:
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    graphcast \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
+```
+
+AIFS2:
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    aifs2 \
+    20260724T000000 \
+    --datasource ifs \
+    --datasource-source azure \
+    --lead-time 240 \
+    --device cuda
+```
+
+Pangu3:
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    pangu3 \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
+```
+
+Forecast products are standardized as:
 
 ```text
 outputs/<model>/<YYYYMMDDTHHMMSS>/forecast.zarr
 ```
 
-Example:
+For this example:
 
 ```text
-outputs/aifs2/20260811T000000/forecast.zarr
-outputs/graphcast/20260811T000000/forecast.zarr
+outputs/graphcast/20260724T000000/forecast.zarr
+outputs/aifs2/20260724T000000/forecast.zarr
+outputs/pangu3/20260724T000000/forecast.zarr
 ```
+
 
 ## 4. Verify one tropical cyclone
 
@@ -52,9 +93,9 @@ aiweather verify-tc \
     --device cpu \
     --minimum-overlap 6 \
     --maximum-mean-error-km 450 \
-    --output outputs/verification/graphcast_20260811_hernan \
+    --output results/verification/graphcast_20260811_hernan \
     --plots \
-    --plot-output outputs/verification/graphcast_20260811_hernan/plots \
+    --plot-output results/verification/graphcast_20260811_hernan/plots \
     --field-leads 24 48 72 96
 ```
 

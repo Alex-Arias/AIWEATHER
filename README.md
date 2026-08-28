@@ -18,7 +18,7 @@ AIWeather currently provides an end-to-end tropical cyclone
 verification workflow built around standardized AIWeather forecast
 stores.
 
-The GraphCast and AIFS2 workflows have been validated end to end, including:
+The GraphCast, AIFS2, and Pangu3 workflows have been validated end to end, including:
 
 - standardized forecast storage;
 - tropical cyclone tracking;
@@ -34,7 +34,7 @@ The GraphCast and AIFS2 workflows have been validated end to end, including:
 - run provenance manifests;
 - command-line execution.
 
-GraphCast and AIFS2 are currently evaluated through the same
+GraphCast, AIFS2, and Pangu3 are currently evaluated through the same
 forecast -> tracking -> QC -> verification framework.
 
 The current controlled Eastern Pacific benchmark includes four
@@ -78,7 +78,7 @@ For development, activate the project environment and install the
 package in editable mode:
 
 ```bash
-conda activate aiweather17_aifs2
+conda activate aiweather17_pangu3
 
 cd /path/to/AIWeather
 
@@ -102,6 +102,61 @@ The command-line interface can be inspected with:
 ```bash
 aiweather --help
 ```
+
+---
+
+## Forecast generation
+
+AIWeather provides a unified forecast launcher for the currently supported
+deterministic models:
+
+```bash
+python scripts/run_aiweather_forecast.py --help
+```
+
+Forecasts are written to the standardized layout:
+
+```text
+outputs/<model>/<initialization>/forecast.zarr
+```
+
+Example: Genevieve initialized at `2026-07-24 00 UTC`.
+
+GraphCast:
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    graphcast \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
+```
+
+AIFS2:
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    aifs2 \
+    20260724T000000 \
+    --datasource ifs \
+    --datasource-source azure \
+    --lead-time 240 \
+    --device cuda
+```
+
+Pangu3:
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    pangu3 \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
+```
+
+See [Running forecast models](docs/forecast_models.md) for details.
 
 ---
 

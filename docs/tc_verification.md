@@ -15,9 +15,9 @@ aiweather verify-tc \
     --device cpu \
     --minimum-overlap 6 \
     --maximum-mean-error-km 450 \
-    --output outputs/verification/graphcast_20260811_hernan \
+    --output results/verification/graphcast_20260811_hernan \
     --plots \
-    --plot-output outputs/verification/graphcast_20260811_hernan/plots \
+    --plot-output results/verification/graphcast_20260811_hernan/plots \
     --field-leads 24 48 72 96
 ```
 
@@ -79,3 +79,90 @@ Always inspect:
 5. full versus common/paired coverage.
 
 Do not interpret a tracker failure as automatically equivalent to a model forecast failure.
+
+## Genevieve three-model example
+
+The same verification workflow can be applied to standardized forecast
+stores from GraphCast, AIFS2, and Pangu3.
+
+Genevieve:
+
+```text
+SID             2026204N08267
+Initialization  20260724T000000
+Domain          5–35 N, 130–90 W
+```
+
+The following focused example uses:
+
+```text
+minimum overlap          3
+maximum mean track error 250 km
+field leads              54 78 96 120 h
+```
+
+These settings are separate from the controlled four-storm benchmark
+configuration documented above.
+
+### GraphCast
+
+```bash
+aiweather verify-tc \
+    --forecast outputs/graphcast/20260724T000000/forecast.zarr \
+    --sid 2026204N08267 \
+    --lat-min 5 \
+    --lat-max 35 \
+    --lon-min -130 \
+    --lon-max -90 \
+    --device cpu \
+    --minimum-overlap 3 \
+    --maximum-mean-error-km 250 \
+    --output results/verification/graphcast_genevieve_20260724T000000 \
+    --plots \
+    --field-leads 54 78 96 120
+```
+
+### AIFS2
+
+```bash
+aiweather verify-tc \
+    --forecast outputs/aifs2/20260724T000000/forecast.zarr \
+    --sid 2026204N08267 \
+    --lat-min 5 \
+    --lat-max 35 \
+    --lon-min -130 \
+    --lon-max -90 \
+    --device cpu \
+    --minimum-overlap 3 \
+    --maximum-mean-error-km 250 \
+    --output results/verification/aifs2_genevieve_20260724T000000 \
+    --plots \
+    --field-leads 54 78 96 120
+```
+
+### Pangu3
+
+```bash
+aiweather verify-tc \
+    --forecast outputs/pangu3/20260724T000000/forecast.zarr \
+    --sid 2026204N08267 \
+    --lat-min 5 \
+    --lat-max 35 \
+    --lon-min -130 \
+    --lon-max -90 \
+    --device cpu \
+    --minimum-overlap 3 \
+    --maximum-mean-error-km 250 \
+    --output results/verification/pangu3_genevieve_20260724T000000 \
+    --plots \
+    --field-leads 54 78 96 120
+```
+
+Keep tracker-association criteria fixed across models when making a
+controlled comparison unless the scientific protocol is deliberately
+changed.
+
+A failed or rejected tracker association is itself a valid verification
+outcome. Do not relax the association threshold merely to force a forecast
+track. Field-based structural diagnostics can be evaluated separately when
+the scientific question requires them.

@@ -1,18 +1,40 @@
 # Running forecast models
 
-AIWeather uses model-specific runners but writes forecasts into a common output organization so that the same verification layer can be applied to different AI weather models.
+AIWeather uses model-specific adapters behind a common forecast interface.
+All supported deterministic models write forecasts to the same standardized
+storage layout, allowing the same tropical-cyclone verification workflow
+to be reused across models.
+
+## Supported deterministic models
+
+The current deterministic forecast workflow supports:
+
+- GraphCast
+- AIFS2
+- Pangu3
+
+The preferred forecast entry point is:
+
+```bash
+python scripts/run_aiweather_forecast.py --help
+```
 
 ## Standard output layout
 
 ```text
 outputs/
+├── graphcast/
+│   └── <initialization>/forecast.zarr
 ├── aifs2/
 │   └── <initialization>/forecast.zarr
-└── graphcast/
+└── pangu3/
     └── <initialization>/forecast.zarr
 ```
 
-Current four-storm initializations:
+The downstream verification layer consumes the standardized
+`forecast.zarr` store and does not depend on which model generated it.
+
+## Current benchmark initializations
 
 ```text
 20260714T120000  Elida
@@ -21,63 +43,105 @@ Current four-storm initializations:
 20260811T000000  Hernan
 ```
 
-## AIFS2
+## Example: Genevieve
 
-The repository contains the AIFS2 forecast script:
-
-```bash
-python scripts/run_aifs2.py --help
-```
-
-Inspect the current command-line interface before a production run:
-
-```bash
-sed -n '1,260p' scripts/run_aifs2.py
-```
-
-The validated AIFS2 environment is:
-
-```bash
-conda activate aiweather17_aifs2
-```
-
-Before running a new storm, confirm that the desired initialization is not already present:
-
-```bash
-find outputs/aifs2 \
-    -mindepth 1 \
-    -maxdepth 1 \
-    -type d \
-    -printf '%f\n' | sort
-```
-
-## GraphCast
-
-GraphCast uses the same AIWeather concept:
+Initialization:
 
 ```text
-initialization + forecast length
-             ↓
-       model runner
-             ↓
- standardized forecast.zarr
-             ↓
- common TC verification
+20260724T000000
 ```
 
-Use the repository's current GraphCast runner/CLI configuration for production rather than copying an old command from notes. The standardized forecast path should be:
+Forecast horizon:
 
 ```text
-outputs/graphcast/<initialization>/forecast.zarr
+240 h
 ```
 
-## Forecast validation
-
-Before TC verification, confirm that the forecast store exists:
+### GraphCast
 
 ```bash
-test -d outputs/aifs2/20260811T000000/forecast.zarr && echo OK
-test -d outputs/graphcast/20260811T000000/forecast.zarr && echo OK
+python scripts/run_aiweather_forecast.py \
+    graphcast \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
 ```
 
-The important reproducibility rule is that downstream verification receives the standardized `forecast.zarr`, regardless of the model-specific forecast-generation details.
+Expected output:
+
+```text
+outputs/graphcast/20260724T000000/forecast.zarr
+```
+
+### AIFS2
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    aifs2 \
+    20260724T000000 \
+    --datasource ifs \
+    --datasource-source azure \
+    --lead-time 240 \
+    --device cuda
+```
+
+Expected output:
+
+```text
+outputs/aifs2/20260724T000000/forecast.zarr
+```
+
+The IFS datasource supports explicit source selection through
+`--datasource-source`. The Azure source is shown here because it has been
+used successfully for historical AIFS2 runs. If the option is omitted,
+the datasource backend default is preserved.
+
+### Pangu3
+
+```bash
+python scripts/run_aiweather_forecast.py \
+    pangu3 \
+    20260724T000000 \
+    --datasource gfs \
+    --lead-time 240 \
+    --device cuda
+```
+
+Expected output:
+
+```text
+outputs/pangu3/20260724T000000/forecast.zarr
+```
+
+Pangu3 may provide a different native output interval from GraphCast and
+AIFS2. Downstream workflows should use the timestamps stored in the
+forecast rather than assuming a fixed cadence.
+
+## Environment
+
+The current combined GraphCast/AIFS2/Pangu3 development environment is:
+
+```bash
+conda activate aiweather17_pangu3
+```
+
+Model-specific environments can still be retained for reproducibility or
+dependency isolation.
+
+## Validate forecast stores
+
+Before tropical-cyclone verification, confirm that the expected stores
+exist:
+
+```bash
+for model in graphcast aifs2 pangu3; do
+    test -d outputs/${model}/20260724T000000/forecast.zarr \
+        && echo "${model}: OK" \
+        || echo "${model}: MISSING"
+done
+```
+
+The important reproducibility rule is that downstream verification receives
+the standardized `forecast.zarr`, regardless of model-specific inference
+details.
