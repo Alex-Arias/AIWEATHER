@@ -22,6 +22,10 @@ _DATASOURCE_REGISTRY = {
         "name": "gfs",
         "class": GFS,
     },
+    "pangu6": {
+        "name": "gfs",
+        "class": GFS,
+    },
     "aifs2": {
         "name": "ifs",
         "class": IFS,

@@ -13,7 +13,8 @@ class PXRunner(BaseRunner):
 
     MODEL_NAME = None
 
-    # GraphCast native timestep (hours)
+    # Default native timestep for 6-hour PX models (hours).
+    # Models with a different cadence override this value.
     MODEL_TIMESTEP = 6
 
     def __init__(self):
@@ -75,15 +76,6 @@ class PXRunner(BaseRunner):
 
     def run_forecast(self, request):
 
-        from aiweather.backends.earth2studio.inference import (
-            run_forecast,
-        )
-
-        print()
-        print(
-            "Running deterministic forecast..."
-        )
-
         if (
             request.lead_time
             % self.MODEL_TIMESTEP
@@ -94,6 +86,15 @@ class PXRunner(BaseRunner):
                 f"to be divisible by "
                 f"{self.MODEL_TIMESTEP} hours."
             )
+
+        from aiweather.backends.earth2studio.inference import (
+            run_forecast,
+        )
+
+        print()
+        print(
+            "Running deterministic forecast..."
+        )
 
         run_forecast(
             time=request.init_time,
