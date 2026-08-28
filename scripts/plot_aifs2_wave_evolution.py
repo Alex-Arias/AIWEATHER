@@ -36,6 +36,22 @@ CASE = get_case(
     args.storm
 )
 
+CENTER_SOURCE = CASE.get(
+    "center_source",
+    "wuduan",
+).lower()
+
+CENTER_SOURCE_LABELS = {
+    "wuduan": "WuDuan",
+    "native": "Native",
+    "ibtracs": "IBTrACS",
+}
+
+CENTER_SOURCE_LABEL = CENTER_SOURCE_LABELS.get(
+    CENTER_SOURCE,
+    CENTER_SOURCE,
+)
+
 STORM_KEY = args.storm.lower()
 
 STORM_NAME = CASE[
@@ -304,7 +320,7 @@ for ax in axes:
 
 fig.suptitle(
     f"AIFS2 Tropical-Cyclone Wave Evolution — {STORM_NAME}\n"
-    "WuDuan storm-relative diagnostics",
+    f"{CENTER_SOURCE_LABEL} storm-relative diagnostics",
     fontsize=14,
     fontweight="bold",
 )

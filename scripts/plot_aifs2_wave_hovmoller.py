@@ -11,6 +11,7 @@ import pandas as pd
 
 from aiweather.forecast import open_forecast
 from wave_cases import get_case
+from wave_centers import load_wave_centers
 
 
 # ============================================================
@@ -36,6 +37,22 @@ args = parser.parse_args()
 
 CASE = get_case(
     args.storm
+)
+
+CENTER_SOURCE = CASE.get(
+    "center_source",
+    "wuduan",
+).lower()
+
+CENTER_SOURCE_LABELS = {
+    "wuduan": "WuDuan",
+    "native": "Native",
+    "ibtracs": "IBTrACS",
+}
+
+CENTER_SOURCE_LABEL = CENTER_SOURCE_LABELS.get(
+    CENTER_SOURCE,
+    CENTER_SOURCE,
 )
 
 STORM_KEY = args.storm.lower()
@@ -255,54 +272,11 @@ lon_grid, lat_grid = np.meshgrid(
 
 
 # ============================================================
-# Load WuDuan track
+# Load storm-relative center positions
 # ============================================================
 
-track_points = pd.read_csv(
-    TRACK_POINTS_PATH
-)
-
-track = (
-    track_points[
-        (
-            track_points[
-                "case_id"
-            ]
-            == CASE_ID
-        )
-        & (
-            track_points[
-                "tracker"
-            ]
-            == "wuduan"
-        )
-        & (
-            track_points[
-                "coverage"
-            ]
-            == "full"
-        )
-    ]
-    .sort_values(
-        "lead_time_hours"
-    )
-    .copy()
-)
-
-
-if track.empty:
-    raise RuntimeError(
-        "No WuDuan track found for "
-        f"{CASE_ID!r}."
-    )
-
-
-track[
-    "forecast_longitude_plot"
-] = to_lon180(
-    track[
-        "forecast_longitude"
-    ].values
+track = load_wave_centers(
+    CASE
 )
 
 
@@ -389,13 +363,13 @@ for _, row in track.iterrows():
 
     tc_lat = float(
         row[
-            "forecast_latitude"
+            "center_latitude"
         ]
     )
 
     tc_lon = float(
         row[
-            "forecast_longitude_plot"
+            "center_longitude_plot"
         ]
     )
 
@@ -696,7 +670,7 @@ ax.set_xlabel(
 )
 
 ax.set_ylabel(
-    "Radius from WuDuan TC center (km)"
+    f"Radius from {CENTER_SOURCE_LABEL} TC center (km)"
 )
 
 ax.set_title(
