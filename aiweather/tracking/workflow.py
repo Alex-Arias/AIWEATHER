@@ -52,6 +52,7 @@ def build_existing_tc_track(
     lon_max: float,
     search_radius_km: float = 500.0,
     wind_radius_km: float = 300.0,
+    maximum_translation_speed_mps: float | None = 20.0,
 ) -> list[TrackRecord]:
     """
     Build a native track for an existing tropical cyclone.
@@ -59,6 +60,9 @@ def build_existing_tc_track(
     Tracking begins at forecast lead zero from a known operational
     storm center. Unlike ``build_native_tc_track``, this workflow
     does not perform genesis detection.
+
+    Tracking terminates when the optional maximum translation
+    speed is exceeded.
     """
 
     region = forecast.select_region(
@@ -77,6 +81,9 @@ def build_existing_tc_track(
         v_wind=region["v10m"],
         search_radius_km=search_radius_km,
         wind_radius_km=wind_radius_km,
+        maximum_translation_speed_mps=(
+            maximum_translation_speed_mps
+        ),
     )
 
     initialization_time = (

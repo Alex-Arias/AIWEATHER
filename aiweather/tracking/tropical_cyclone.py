@@ -202,6 +202,7 @@ def track_pressure_minimum(
     u_wind: xr.DataArray | None = None,
     v_wind: xr.DataArray | None = None,
     wind_radius_km: float = 300.0,
+    maximum_translation_speed_mps: float | None = None,
 ) -> list[TrackPoint]:
     """
     Track a pressure minimum using spatial continuity.
@@ -246,6 +247,12 @@ def track_pressure_minimum(
     wind_radius_km : float, default=300
         Radius used to calculate local maximum wind speed.
 
+    maximum_translation_speed_mps : float or None, default=None
+        Optional maximum translation speed allowed between
+        consecutive tracked centers. If exceeded, tracking
+        terminates before the candidate center is accepted.
+        None disables translation-speed termination.
+
     Returns
     -------
     list[TrackPoint]
@@ -273,6 +280,15 @@ def track_pressure_minimum(
     if wind_radius_km <= 0.0:
         raise ValueError(
             "wind_radius_km must be greater than zero."
+        )
+
+    if (
+        maximum_translation_speed_mps is not None
+        and maximum_translation_speed_mps <= 0.0
+    ):
+        raise ValueError(
+            "maximum_translation_speed_mps must be "
+            "greater than zero."
         )
 
     if "lead_time" not in pressure.dims:
@@ -408,6 +424,43 @@ def track_pressure_minimum(
             .astype("timedelta64[h]")
             .astype(int)
         )
+
+        if (
+            maximum_translation_speed_mps is not None
+            and track
+        ):
+            previous_point = track[-1]
+
+            delta_hours = (
+                lead_hours
+                - previous_point.lead_time_hours
+            )
+
+            if delta_hours <= 0:
+                raise ValueError(
+                    "lead_time values must increase "
+                    "strictly during tracking."
+                )
+
+            displacement_km = float(
+                great_circle_distance_km(
+                    previous_point.latitude,
+                    previous_point.longitude,
+                    minimum.latitude,
+                    minimum.longitude,
+                )
+            )
+
+            translation_speed_mps = (
+                displacement_km * 1000.0
+                / (delta_hours * 3600.0)
+            )
+
+            if (
+                translation_speed_mps
+                > maximum_translation_speed_mps
+            ):
+                break
 
         max_wind = None
         wind_units = None

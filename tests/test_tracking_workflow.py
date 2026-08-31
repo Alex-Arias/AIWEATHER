@@ -118,6 +118,7 @@ def test_build_existing_tc_track(
     assert captured["start_index"] == 0
     assert captured["search_radius_km"] == 400.0
     assert captured["wind_radius_km"] == 250.0
+    assert captured["maximum_translation_speed_mps"] == 20.0
 
 
 def test_build_existing_tc_track_missing_initialization_time(

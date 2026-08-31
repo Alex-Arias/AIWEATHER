@@ -218,6 +218,83 @@ def test_track_pressure_minimum_rejects_invalid_start_index():
         )
 
 
+def test_track_pressure_minimum_rejects_invalid_translation_speed():
+    pressure = xr.DataArray(
+        np.ones((1, 1, 1)),
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [np.timedelta64(0, "h")],
+            "lat": [10.0],
+            "lon": [250.0],
+        },
+    )
+
+    with pytest.raises(ValueError):
+        track_pressure_minimum(
+            pressure,
+            initial_latitude=10.0,
+            initial_longitude=250.0,
+            maximum_translation_speed_mps=0.0,
+        )
+
+
+def test_track_pressure_minimum_terminates_on_fast_translation():
+    pressure = xr.DataArray(
+        [
+            [[99000.0, 101000.0, 101000.0]],
+            [[101000.0, 101000.0, 98000.0]],
+        ],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [
+                np.timedelta64(0, "h"),
+                np.timedelta64(3, "h"),
+            ],
+            "lat": [10.0],
+            "lon": [250.0, 252.0, 254.0],
+        },
+    )
+
+    track = track_pressure_minimum(
+        pressure,
+        initial_latitude=10.0,
+        initial_longitude=250.0,
+        search_radius_km=500.0,
+        maximum_translation_speed_mps=20.0,
+    )
+
+    assert len(track) == 1
+    assert track[0].lead_time_hours == 0
+
+
+def test_track_pressure_minimum_none_preserves_fast_candidate():
+    pressure = xr.DataArray(
+        [
+            [[99000.0, 101000.0, 101000.0]],
+            [[101000.0, 101000.0, 98000.0]],
+        ],
+        dims=("lead_time", "lat", "lon"),
+        coords={
+            "lead_time": [
+                np.timedelta64(0, "h"),
+                np.timedelta64(3, "h"),
+            ],
+            "lat": [10.0],
+            "lon": [250.0, 252.0, 254.0],
+        },
+    )
+
+    track = track_pressure_minimum(
+        pressure,
+        initial_latitude=10.0,
+        initial_longitude=250.0,
+        search_radius_km=500.0,
+        maximum_translation_speed_mps=None,
+    )
+
+    assert len(track) == 2
+    assert track[1].longitude == pytest.approx(254.0)
+
 # ---------------------------------------------------------
 # Wind diagnostics attached to tracking
 # ---------------------------------------------------------
