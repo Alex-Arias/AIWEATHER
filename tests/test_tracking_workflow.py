@@ -1,9 +1,11 @@
 import numpy as np
+import pytest
 
 from aiweather.forecast import ForecastMetadata
 from aiweather.tracking.genesis import GenesisResult
 from aiweather.tracking.records import TrackRecord
 from aiweather.tracking.workflow import (
+    build_existing_tc_track,
     build_native_tc_track,
 )
 
@@ -57,9 +59,91 @@ class DummyForecast:
         lat_max,
         lon_min,
         lon_max,
+
     ):
         return DummyRegion()
 
+def test_build_existing_tc_track(
+    monkeypatch,
+):
+    expected_records = [
+        TrackRecord(
+            lead_time_hours=0,
+            valid_time=np.datetime64(
+                "2026-07-24T00:00:00"
+            ),
+            latitude=10.0,
+            longitude=250.0,
+            pressure=100000.0,
+            pressure_units="Pa",
+            max_wind=20.0,
+            wind_units="m/s",
+        )
+    ]
+
+    captured = {}
+
+    def fake_track_pressure_minimum(
+        pressure,
+        **kwargs,
+    ):
+        captured.update(kwargs)
+        return ["existing-track"]
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow.track_pressure_minimum",
+        fake_track_pressure_minimum,
+    )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow.build_track_records",
+        lambda *args, **kwargs: expected_records,
+    )
+
+    records = build_existing_tc_track(
+        DummyForecast(),
+        initial_latitude=10.0,
+        initial_longitude=250.0,
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-130.0,
+        lon_max=-90.0,
+        search_radius_km=400.0,
+        wind_radius_km=250.0,
+    )
+
+    assert records is expected_records
+    assert captured["initial_latitude"] == 10.0
+    assert captured["initial_longitude"] == 250.0
+    assert captured["start_index"] == 0
+    assert captured["search_radius_km"] == 400.0
+    assert captured["wind_radius_km"] == 250.0
+
+
+def test_build_existing_tc_track_missing_initialization_time(
+    monkeypatch,
+):
+    forecast = DummyForecast()
+    forecast.metadata.initialization_time = None
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow.track_pressure_minimum",
+        lambda *args, **kwargs: ["existing-track"],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="initialization_time",
+    ):
+        build_existing_tc_track(
+            forecast,
+            initial_latitude=10.0,
+            initial_longitude=250.0,
+            lat_min=5.0,
+            lat_max=35.0,
+            lon_min=-130.0,
+            lon_max=-90.0,
+        )
 
 def test_build_native_tc_track(
     monkeypatch,
@@ -131,8 +215,6 @@ def test_build_native_tc_track(
 
     assert result_genesis is genesis
     assert records is expected_records
-
-import pytest
 
 
 def test_build_native_tc_track_no_genesis(

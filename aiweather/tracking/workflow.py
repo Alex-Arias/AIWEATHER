@@ -25,7 +25,10 @@ from .records import (
     TrackRecord,
     build_track_records,
 )
-from .tropical_cyclone import track_from_genesis
+from .tropical_cyclone import (
+    track_from_genesis,
+    track_pressure_minimum,
+)
 
 
 @dataclass(slots=True)
@@ -37,6 +40,59 @@ class TrackingWorkflowResult:
     genesis: GenesisResult | None
     native_records: list[TrackRecord]
     evaluation: TrackerEvaluation | None = None
+
+def build_existing_tc_track(
+    forecast: Forecast,
+    *,
+    initial_latitude: float,
+    initial_longitude: float,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    search_radius_km: float = 500.0,
+    wind_radius_km: float = 300.0,
+) -> list[TrackRecord]:
+    """
+    Build a native track for an existing tropical cyclone.
+
+    Tracking begins at forecast lead zero from a known operational
+    storm center. Unlike ``build_native_tc_track``, this workflow
+    does not perform genesis detection.
+    """
+
+    region = forecast.select_region(
+        lat_min=lat_min,
+        lat_max=lat_max,
+        lon_min=lon_min,
+        lon_max=lon_max,
+    )
+
+    track = track_pressure_minimum(
+        region["msl"],
+        initial_latitude=initial_latitude,
+        initial_longitude=initial_longitude,
+        start_index=0,
+        u_wind=region["u10m"],
+        v_wind=region["v10m"],
+        search_radius_km=search_radius_km,
+        wind_radius_km=wind_radius_km,
+    )
+
+    initialization_time = (
+        forecast.metadata.initialization_time
+    )
+
+    if initialization_time is None:
+        raise ValueError(
+            "Forecast initialization_time metadata "
+            "is required for track records."
+        )
+
+    return build_track_records(
+        track,
+        initialization_time=initialization_time,
+    )
 
 
 def build_native_tc_track(
