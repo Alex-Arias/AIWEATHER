@@ -2,6 +2,7 @@ from datetime import datetime
 
 import numpy as np
 import pytest
+import xarray as xr
 
 from aiweather.forecast import (
     Forecast,
@@ -109,6 +110,76 @@ def test_invalid_forecast_path(tmp_path):
     with pytest.raises(ValueError):
         open_forecast(invalid_path)
 
+def test_open_forecast_noncanonical_name_with_metadata(
+    tmp_path,
+):
+    path = tmp_path / "forecast_azure.zarr"
+
+    dataset = xr.Dataset(
+        data_vars={
+            "msl": (
+                (
+                    "time",
+                    "lead_time",
+                    "lat",
+                    "lon",
+                ),
+                np.ones(
+                    (1, 2, 2, 2),
+                    dtype=np.float32,
+                ),
+            ),
+        },
+        coords={
+            "time": [
+                np.datetime64(
+                    "2026-08-29T12:00:00"
+                )
+            ],
+            "lead_time": np.array(
+                [
+                    np.timedelta64(0, "h"),
+                    np.timedelta64(6, "h"),
+                ]
+            ),
+            "lat": [15.0, 16.0],
+            "lon": [242.0, 243.0],
+        },
+        attrs={
+            "aiweather_model": "aifs2",
+            "aiweather_forecast_id": (
+                "aifs2_ifs_"
+                "20260829T120000_6h"
+            ),
+            "aiweather_initialization_time": (
+                "2026-08-29T12:00:00"
+            ),
+            "aiweather_backend": "earth2studio",
+            "aiweather_datasource": "ifs",
+        },
+    )
+
+    dataset.to_zarr(
+        path,
+        mode="w",
+    )
+
+    forecast = open_forecast(path)
+
+    assert isinstance(forecast, Forecast)
+    assert forecast.metadata.model_name == "aifs2"
+    assert (
+        forecast.metadata.forecast_id
+        == "aifs2_ifs_20260829T120000_6h"
+    )
+    assert (
+        forecast.metadata.initialization_time
+        == datetime(2026, 8, 29, 12)
+    )
+    assert (
+        forecast.metadata.backend
+        == "earth2studio"
+    )
 
 # ---------------------------------------------------------
 # Variable access

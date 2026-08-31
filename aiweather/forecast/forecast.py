@@ -716,12 +716,23 @@ def _metadata_from_path(
 
     path = Path(path)
 
+    attrs = dataset.attrs
+
+    has_aiweather_metadata = (
+        attrs.get("aiweather_model") is not None
+        and attrs.get(
+            "aiweather_initialization_time"
+        ) is not None
+    )
+
     # ---------------------------------------------------------
     # Canonical AIWeather output
     # ---------------------------------------------------------
 
-    if path.name == "forecast.zarr":
-        attrs = dataset.attrs
+    if (
+        path.name == "forecast.zarr"
+        or has_aiweather_metadata
+    ):
 
         model = attrs.get(
             "aiweather_model"

@@ -68,6 +68,10 @@ from .workflow import (
     evaluate_forecast_trackers,
 )
 
+from .export import (
+    export_operational_track,
+)
+
 __all__ = [
     "TCClassification",
     "TrackMotion",
@@ -79,6 +83,7 @@ __all__ = [
     "initial_bearing_degrees",
     "records_to_dataframe",
     "records_to_xarray",
+    "export_operational_track",
     "track_motion",
     "track_pressure_minimum",
     "CandidatePoint",
