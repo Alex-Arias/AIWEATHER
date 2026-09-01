@@ -48,6 +48,7 @@ CENTER_SOURCE_LABELS = {
     "wuduan": "WuDuan",
     "native": "Native",
     "ibtracs": "IBTrACS",
+    "operational": "Operational",
 }
 
 CENTER_SOURCE_LABEL = CENTER_SOURCE_LABELS.get(
@@ -75,13 +76,10 @@ CASE_ID = CASE[
 # ============================================================
 
 FORECAST_PATH = Path(
-    "outputs/aifs2"
-) / INIT / "forecast.zarr"
-
-TRACK_POINTS_PATH = Path(
-    "results/verification/batch/"
-    "aifs2_epac_4storm/"
-    "batch_points.csv"
+    CASE.get(
+        "forecast_path",
+        Path("outputs/aifs2") / INIT / "forecast.zarr",
+    )
 )
 
 OUTPUT_DIR = Path(

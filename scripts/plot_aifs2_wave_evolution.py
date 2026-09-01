@@ -45,6 +45,7 @@ CENTER_SOURCE_LABELS = {
     "wuduan": "WuDuan",
     "native": "Native",
     "ibtracs": "IBTrACS",
+    "operational": "Operational",
 }
 
 CENTER_SOURCE_LABEL = CENTER_SOURCE_LABELS.get(
