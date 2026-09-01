@@ -18,6 +18,9 @@ native
 
 ibtracs
     Standalone IBTrACS reference CSV produced by AIWeather verification.
+
+operational
+    Operational existing-TC track CSV exported by AIWeather.
 """
 
 from pathlib import Path
@@ -133,6 +136,7 @@ def load_wave_centers(case):
     elif source in {
         "native",
         "ibtracs",
+        "operational",
     }:
 
         if "center_path" not in case:
@@ -194,7 +198,7 @@ def load_wave_centers(case):
             f"Unsupported wave center source "
             f"{source!r}. "
             "Expected one of: "
-            "wuduan, native, ibtracs."
+            "wuduan, native, ibtracs, operational."
         )
 
     centers = (

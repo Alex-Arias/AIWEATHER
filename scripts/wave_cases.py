@@ -59,6 +59,39 @@ CASES = {
             "ibtracs.csv"
         ),
     },
+
+    "karina": {
+        "storm_name": "Karina",
+        "init": "20260829T120000",
+        "case_id": "karina_20260829T120000",
+        "center_source": "operational",
+        "center_path": (
+            "results/operational/"
+            "karina_20260829T120000/"
+            "aifs2_track.csv"
+        ),
+        "forecast_path": (
+            "outputs/aifs2/"
+            "20260829T120000/"
+            "forecast_azure.zarr"
+        ),
+        "wave_lead_times": [
+            0,
+            24,
+            48,
+            72,
+            96,
+            120,
+            144,
+            168,
+            192,
+            216,
+            240,
+        ],
+        "swh_max": 10.0,
+        "mwp_max": 16.0,
+        "wind_max": 30.0,
+    },
 }
 
 

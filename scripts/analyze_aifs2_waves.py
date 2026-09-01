@@ -7,9 +7,8 @@ Creates:
     3. CSV summary of wave conditions within 300, 500, and 800 km.
     4. Storm-relative SWH evolution figure.
 
-The script reads an existing AIWeather AIFS2 forecast and existing
-point-level tropical-cyclone verification output. It does not rerun
-AIFS2 or the tracker.
+The script reads an existing AIWeather AIFS2 forecast and a configured
+storm-center source. It does not rerun AIFS2 or the tracker.
 """
 
 from pathlib import Path
@@ -63,6 +62,7 @@ CENTER_SOURCE_LABELS = {
     "wuduan": "WuDuan",
     "native": "Native",
     "ibtracs": "IBTrACS",
+    "operational": "Operational",
 }
 
 CENTER_SOURCE_LABEL = CENTER_SOURCE_LABELS.get(
@@ -90,13 +90,12 @@ CASE_ID = CASE[
 # ============================================================
 
 FORECAST_PATH = Path(
-    "outputs/aifs2"
-) / INIT / "forecast.zarr"
-
-TRACK_POINTS_PATH = Path(
-    "results/verification/batch/"
-    "aifs2_epac_4storm/"
-    "batch_points.csv"
+    CASE.get(
+        "forecast_path",
+        Path(
+            "outputs/aifs2"
+        ) / INIT / "forecast.zarr",
+    )
 )
 
 OUTPUT_DIR = Path(
@@ -108,14 +107,17 @@ OUTPUT_DIR = Path(
 # Analysis configuration
 # ============================================================
 
-LEAD_TIMES = [
-    0,
-    24,
-    48,
-    72,
-    96,
-    120,
-]
+LEAD_TIMES = CASE.get(
+    "wave_lead_times",
+    [
+        0,
+        24,
+        48,
+        72,
+        96,
+        120,
+    ],
+)
 
 LAT_MIN = 5.0
 LAT_MAX = 35.0
@@ -137,39 +139,31 @@ QUIVER_STEP = 12
 # ============================================================
 
 SWH_MIN = 0.0
-SWH_MAX = 10.0
+SWH_MAX = CASE.get(
+    "swh_max",
+    7.0,
+)
 
 MWP_MIN = 2.0
-MWP_MAX = 16.0
+MWP_MAX = CASE.get(
+    "mwp_max",
+    14.0,
+)
 
 MWD_MIN = 0.0
 MWD_MAX = 360.0
 
 WIND_MIN = 0.0
-WIND_MAX = 27.0
+WIND_MAX = CASE.get(
+    "wind_max",
+    21.0,
+)
 
 
 OUTPUT_DIR.mkdir(
     parents=True,
     exist_ok=True,
 )
-
-
-# ============================================================
-# Fixed plotting scales
-# ============================================================
-
-SWH_MIN = 0.0
-SWH_MAX = 7.0
-
-MWP_MIN = 2.0
-MWP_MAX = 14.0
-
-MWD_MIN = 0.0
-MWD_MAX = 360.0
-
-WIND_MIN = 0.0
-WIND_MAX = 21.0
 
 
 # ============================================================
@@ -982,6 +976,69 @@ for _, row in track.iterrows():
         )
     )
 
+    # --------------------------------------------------------
+    # Location of regional SWH maximum
+    # --------------------------------------------------------
+
+    regional_swh_index = np.unravel_index(
+        np.nanargmax(
+            swh
+        ),
+        swh.shape,
+    )
+
+    regional_max_swh_latitude = float(
+        lat_grid[
+            regional_swh_index
+        ]
+    )
+
+    regional_max_swh_longitude = float(
+        lon_grid[
+            regional_swh_index
+        ]
+    )
+
+    regional_max_swh_distance_from_tc_km = float(
+        haversine_distance_km(
+            regional_max_swh_latitude,
+            regional_max_swh_longitude,
+            tc_lat,
+            tc_lon,
+        )
+    )
+
+    # --------------------------------------------------------
+    # Location of regional wind-speed maximum
+    # --------------------------------------------------------
+
+    regional_wind_index = np.unravel_index(
+        np.nanargmax(
+            wind_speed
+        ),
+        wind_speed.shape,
+    )
+
+    regional_max_wind_latitude = float(
+        lat_grid[
+            regional_wind_index
+        ]
+    )
+
+    regional_max_wind_longitude = float(
+        lon_grid[
+            regional_wind_index
+        ]
+    )
+
+    regional_max_wind_distance_from_tc_km = float(
+        haversine_distance_km(
+            regional_max_wind_latitude,
+            regional_max_wind_longitude,
+            tc_lat,
+            tc_lon,
+        )
+    )
 
     result = {
         "case_id":
@@ -1004,10 +1061,29 @@ for _, row in track.iterrows():
                 swh
             ),
 
+        "regional_max_swh_latitude":
+            regional_max_swh_latitude,
+
+        "regional_max_swh_longitude":
+            regional_max_swh_longitude,
+
+        "regional_max_swh_distance_from_tc_km":
+            regional_max_swh_distance_from_tc_km,
+
         "regional_max_wind_ms":
             np.nanmax(
                 wind_speed
             ),
+
+        "regional_max_wind_latitude":
+            regional_max_wind_latitude,
+
+        "regional_max_wind_longitude":
+            regional_max_wind_longitude,
+
+        "regional_max_wind_distance_from_tc_km":
+            regional_max_wind_distance_from_tc_km,
+
     }
 
 
