@@ -92,6 +92,81 @@ CASES = {
         "mwp_max": 16.0,
         "wind_max": 30.0,
     },
+    "marie": {
+        "storm_name": "Marie",
+        "init": "20260903T000000",
+        "case_id": "marie_20260903T000000",
+        "center_source": "operational",
+        "center_path": (
+            "results/operational/"
+            "marie_20260903T000000/"
+            "aifs2/"
+            "aifs2_track.csv"
+        ),
+        "forecast_path": (
+            "outputs/aifs2/"
+            "20260903T000000/"
+            "forecast_azure.zarr"
+        ),
+        "wave_lead_times": [
+            0,
+            24,
+            48,
+            72,
+            96,
+            120,
+            144,
+            168,
+            192,
+            210,
+        ],
+        "lat_min": 5.0,
+        "lat_max": 40.0,
+        "lon_min": -170.0,
+        "lon_max": -95.0,
+        "swh_max": 12.0,
+        "mwp_max": 18.0,
+        "wind_max": 40.0,
+    },
+
+    "lowell": {
+        "storm_name": "Lowell",
+        "init": "20260903T000000",
+        "case_id": "lowell_20260903T000000",
+        "center_source": "operational",
+        "center_path": (
+            "results/operational/"
+            "lowell_20260903T000000/"
+            "aifs2/"
+            "aifs2_track.csv"
+        ),
+        "forecast_path": (
+            "outputs/aifs2/"
+            "20260903T000000/"
+            "forecast_azure.zarr"
+        ),
+        "wave_lead_times": [
+            0,
+            24,
+            48,
+            72,
+            96,
+            120,
+            144,
+            168,
+            192,
+            216,
+            240,
+        ],
+        "lat_min": 0.0,
+        "lat_max": 40.0,
+        "lon_min": -200.0,
+        "lon_max": -130.0,
+        "longitude_reference": -154.7,
+        "swh_max": 12.0,
+        "mwp_max": 18.0,
+        "wind_max": 50.0,
+    },
 }
 
 

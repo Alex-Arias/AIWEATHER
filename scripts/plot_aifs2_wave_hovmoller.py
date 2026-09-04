@@ -11,7 +11,10 @@ import pandas as pd
 
 from aiweather.forecast import open_forecast
 from wave_cases import get_case
-from wave_centers import load_wave_centers
+from wave_centers import (
+    load_wave_centers,
+    longitude_near_reference,
+)
 
 
 # ============================================================
@@ -86,11 +89,29 @@ OUTPUT_DIR = Path(
     "results/waves"
 ) / f"aifs2_{STORM_KEY}"
 
-LAT_MIN = 5.0
-LAT_MAX = 35.0
+LAT_MIN = CASE.get(
+    "lat_min",
+    5.0,
+)
 
-LON_MIN = -160.0
-LON_MAX = -90.0
+LAT_MAX = CASE.get(
+    "lat_max",
+    35.0,
+)
+
+LON_MIN = CASE.get(
+    "lon_min",
+    -160.0,
+)
+
+LON_MAX = CASE.get(
+    "lon_max",
+    -90.0,
+)
+
+LONGITUDE_REFERENCE = CASE.get(
+    "longitude_reference"
+)
 
 RADIAL_BIN_KM = 50.0
 MAX_RADIUS_KM = 800.0
@@ -220,6 +241,13 @@ lat = np.asarray(
 lon = to_lon180(
     ds["lon"].values
 )
+
+if LONGITUDE_REFERENCE is not None:
+
+    lon = longitude_near_reference(
+        lon,
+        LONGITUDE_REFERENCE,
+    )
 
 lon_order = np.argsort(
     lon

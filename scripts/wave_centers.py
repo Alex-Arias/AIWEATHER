@@ -51,6 +51,28 @@ def to_lon180(values):
         - 180.0
     )
 
+def longitude_near_reference(
+    values,
+    reference,
+):
+    """
+    Place longitude on the 360-degree branch nearest a reference.
+    """
+
+    values = np.asarray(
+        values,
+        dtype=float,
+    )
+
+    return (
+        reference
+        + (
+            values
+            - reference
+            + 180.0
+        ) % 360.0
+        - 180.0
+    )
 
 def load_wave_centers(case):
     """
@@ -230,13 +252,28 @@ def load_wave_centers(case):
             f"found for case {case_id!r}."
         )
 
-    centers[
-        "center_longitude_plot"
-    ] = to_lon180(
+    center_longitude_plot = to_lon180(
         centers[
             "center_longitude"
         ].values
     )
+
+    longitude_reference = case.get(
+        "longitude_reference"
+    )
+
+    if longitude_reference is not None:
+
+        center_longitude_plot = (
+            longitude_near_reference(
+                center_longitude_plot,
+                longitude_reference,
+            )
+        )
+
+    centers[
+        "center_longitude_plot"
+    ] = center_longitude_plot
 
     centers[
         "center_source"

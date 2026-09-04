@@ -1,7 +1,10 @@
 import pandas as pd
 import pytest
 
-from scripts.wave_centers import load_wave_centers
+from scripts.wave_centers import (
+    load_wave_centers,
+    longitude_near_reference,
+)
 
 
 def test_load_operational_wave_centers(tmp_path):
@@ -103,3 +106,75 @@ def test_reject_unsupported_wave_center_source():
         match="Unsupported wave center source",
     ):
         load_wave_centers(case)
+
+def test_longitude_near_reference_crosses_dateline():
+    result = longitude_near_reference(
+        [
+            -154.7,
+            -175.0,
+            179.0,
+            170.0,
+        ],
+        -154.7,
+    )
+
+    assert result.tolist() == pytest.approx(
+        [
+            -154.7,
+            -175.0,
+            -181.0,
+            -190.0,
+        ]
+    )
+
+
+def test_operational_wave_centers_unwrap_dateline(tmp_path):
+    path = tmp_path / "operational_track.csv"
+
+    pd.DataFrame(
+        {
+            "lead_time_hours": [
+                0,
+                6,
+                12,
+                18,
+            ],
+            "latitude": [
+                13.3,
+                14.0,
+                15.0,
+                16.0,
+            ],
+            "longitude": [
+                205.3,
+                185.0,
+                179.0,
+                170.0,
+            ],
+        }
+    ).to_csv(
+        path,
+        index=False,
+    )
+
+    case = {
+        "case_id": "lowell_test",
+        "center_source": "operational",
+        "center_path": str(path),
+        "longitude_reference": -154.7,
+    }
+
+    centers = load_wave_centers(
+        case
+    )
+
+    assert centers[
+        "center_longitude_plot"
+    ].tolist() == pytest.approx(
+        [
+            -154.7,
+            -175.0,
+            -181.0,
+            -190.0,
+        ]
+    )
