@@ -210,7 +210,7 @@ def main() -> None:
     input_dir = args.input_dir
 
     provenance_files = sorted(
-        input_dir.glob(
+        input_dir.rglob(
             "*_track.provenance.json"
         )
     )

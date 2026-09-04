@@ -117,3 +117,56 @@ def test_summarize_track_pairs_provenance_with_csv(
     assert result["reaches_forecast_horizon"] is True
     assert result["last_latitude"] == 16.0
     assert result["last_longitude"] == 242.0
+
+
+def test_main_discovers_tracks_in_model_subdirectories(
+    tmp_path,
+    monkeypatch,
+):
+    model_dir = tmp_path / "model_a"
+    model_dir.mkdir()
+
+    provenance_path = (
+        model_dir
+        / "model_a_track.provenance.json"
+    )
+    provenance_path.write_text(
+        "{}",
+        encoding="utf-8",
+    )
+
+    seen_paths = []
+
+    def fake_summarize_track(path):
+        seen_paths.append(path)
+        return {
+            "model": "model_a",
+            "number_of_points": 3,
+            "last_lead_time_hours": 12,
+            "forecast_horizon_hours": 12,
+            "reaches_forecast_horizon": True,
+        }
+
+    monkeypatch.setattr(
+        summary,
+        "summarize_track",
+        fake_summarize_track,
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "summarize_operational_tracks.py",
+            "--input-dir",
+            str(tmp_path),
+        ],
+    )
+
+    summary.main()
+
+    assert seen_paths == [
+        provenance_path
+    ]
+    assert (
+        tmp_path / "track_summary.csv"
+    ).exists()

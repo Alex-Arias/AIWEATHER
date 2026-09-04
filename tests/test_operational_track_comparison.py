@@ -306,3 +306,49 @@ def test_validate_common_case_rejects_mismatch(
         MODULE.validate_common_case(
             tracks
         )
+
+
+def test_longitude_near_reference_crosses_dateline():
+    result = MODULE.longitude_near_reference(
+        np.array(
+            [
+                -154.75,
+                -175.0,
+                179.0,
+                170.0,
+            ]
+        ),
+        -154.75,
+    )
+
+    np.testing.assert_allclose(
+        result,
+        [
+            -154.75,
+            -175.0,
+            -181.0,
+            -190.0,
+        ],
+    )
+
+
+def test_longitude_near_reference_preserves_eastern_pacific():
+    result = MODULE.longitude_near_reference(
+        np.array(
+            [
+                -113.0,
+                -130.0,
+                -156.5,
+            ]
+        ),
+        -112.7,
+    )
+
+    np.testing.assert_allclose(
+        result,
+        [
+            -113.0,
+            -130.0,
+            -156.5,
+        ],
+    )

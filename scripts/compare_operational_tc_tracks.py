@@ -186,7 +186,7 @@ def discover_tracks(
 ) -> dict[str, dict]:
     """Discover operational track/provenance pairs."""
     provenance_paths = sorted(
-        input_dir.glob(
+        input_dir.rglob(
             "*_track.provenance.json"
         )
     )
@@ -564,6 +564,30 @@ def build_pairwise_comparisons(
     return detailed, summary
 
 
+def longitude_near_reference(
+    longitude: float | np.ndarray,
+    reference: float,
+):
+    """Place longitude on the 360-degree branch nearest a reference."""
+    values = np.asarray(
+        longitude,
+        dtype=float,
+    )
+
+    adjusted = (
+        reference
+        + (
+            values - reference + 180.0
+        ) % 360.0
+        - 180.0
+    )
+
+    if np.ndim(longitude) == 0:
+        return float(adjusted)
+
+    return adjusted
+
+
 def plot_track_map(
     tracks: dict[str, dict],
     output_path: Path,
@@ -578,11 +602,41 @@ def plot_track_map(
         figsize=(10, 7)
     )
 
+    geographic_crs = ccrs.PlateCarree()
+
+    first_item = next(
+        iter(tracks.values())
+    )
+
+    seed = first_item[
+        "provenance"
+    ]["seed"]
+
+    seed_longitude = normalize_longitude(
+        seed["longitude"]
+    )
+
+    seed_latitude = float(
+        seed["latitude"]
+    )
+
+    map_crs = ccrs.PlateCarree(
+        central_longitude=(
+            180.0
+            if abs(seed_longitude) > 150.0
+            else 0.0
+        )
+    )
+
+    figure = plt.figure(
+        figsize=(10, 7)
+    )
+
     ax = figure.add_subplot(
         1,
         1,
         1,
-        projection=geographic_crs,
+        projection=map_crs,
     )
 
     all_longitudes = []
@@ -595,15 +649,19 @@ def plot_track_map(
             "records"
         ]
 
-        longitude = np.asarray(
-            [
-                normalize_longitude(
-                    record.longitude
-                )
-                for record in records
-            ],
-            dtype=float,
+        longitude = longitude_near_reference(
+            np.asarray(
+                [
+                    normalize_longitude(
+                        record.longitude
+                    )
+                    for record in records
+                ],
+                dtype=float,
+            ),
+            seed_longitude,
         )
+
 
         latitude = np.asarray(
             [
@@ -646,24 +704,6 @@ def plot_track_map(
             s=65,
             transform=geographic_crs,
         )
-
-    first_item = next(
-        iter(tracks.values())
-    )
-
-    seed = first_item[
-        "provenance"
-    ]["seed"]
-
-    seed_longitude = (
-        normalize_longitude(
-            seed["longitude"]
-        )
-    )
-
-    seed_latitude = float(
-        seed["latitude"]
-    )
 
     ax.scatter(
         seed_longitude,
@@ -729,9 +769,45 @@ def plot_track_map(
         crs=geographic_crs,
     )
 
-    ax.xaxis.set_major_formatter(
-        LONGITUDE_FORMATTER
-    )
+    if abs(seed_longitude) > 150.0:
+        longitude_labels = []
+
+        for longitude in longitude_ticks:
+            normalized = (
+                longitude + 180.0
+            ) % 360.0 - 180.0
+
+            if np.isclose(
+                abs(normalized),
+                180.0,
+            ):
+                label = "180°"
+            elif np.isclose(
+                normalized,
+                0.0,
+            ):
+                label = "0°"
+            elif normalized > 0.0:
+                label = (
+                    f"{abs(normalized):g}°E"
+                )
+            else:
+                label = (
+                    f"{abs(normalized):g}°W"
+                )
+
+            longitude_labels.append(
+                label
+            )
+
+        ax.set_xticklabels(
+            longitude_labels
+        )
+
+    else:
+        ax.xaxis.set_major_formatter(
+            LONGITUDE_FORMATTER
+        )
 
     ax.yaxis.set_major_formatter(
         LATITUDE_FORMATTER
