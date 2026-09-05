@@ -63,6 +63,7 @@ Detailed workflow documentation is available in `docs/`:
 - [Running forecast models](docs/forecast_models.md)
 - [HPC workflow](docs/hpc_workflow.md)
 - [Single-storm TC verification](docs/tc_verification.md)
+- [Operational tropical cyclone workflow](docs/operational_tc_workflow.md)
 - [Multi-storm batch verification](docs/batch_verification.md)
 - [GraphCast vs AIFS2 comparison](docs/model_comparison.md)
 - [AIFS2 wave analysis](docs/wave_analysis.md)
@@ -173,9 +174,31 @@ See [Running forecast models](docs/forecast_models.md) for details.
 
 ---
 
+## Operational tropical cyclone analysis
+
+AIWeather supports deterministic operational-style analysis of an already
+identified tropical cyclone using AIFS2, GraphCast, Pangu3, and Pangu6
+forecast products. The workflow uses a known storm position as a search seed,
+tracks the model-derived vortex forward in time, records track provenance,
+compares deterministic model trajectories, and supports AIFS2 storm-relative
+wave diagnostics.
+
+Karina provided the first completed pseudo-operational demonstration of this
+workflow, followed by the Marie and Lowell experiments. The Lowell case also
+validated continuous-longitude handling for dateline-adjacent tracks and wave
+fields.
+
+Operational inter-model separation is not forecast error or skill unless an
+independent reference track is introduced. See
+[Operational tropical cyclone workflow](docs/operational_tc_workflow.md) for
+the complete workflow, development history, interpretation rules, and case
+studies.
+
+---
+
 ## Tropical cyclone verification
 
-The primary operational CLI workflow is:
+The primary tropical cyclone verification CLI workflow is:
 
 ```bash
 aiweather verify-tc

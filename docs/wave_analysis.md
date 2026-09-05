@@ -16,6 +16,20 @@ Storm-specific Fausto and Genevieve copies were intentionally removed after the 
 
 The generalized workflow has now been exercised successfully for Elida, Fausto, Genevieve, and Hernan.
 
+The same generalized analysis framework has subsequently been extended to
+operational-style existing-TC cases. Karina provided the first completed
+pseudo-operational wave demonstration, followed by Marie and Lowell. In these
+cases the wave diagnostics use the accepted model-derived operational track
+rather than requiring a best-track-verified trajectory. Lowell also exercises
+the dateline-safe longitude handling implemented for operational track and wave
+products.
+
+These two uses should remain conceptually distinct: the earlier benchmark
+workflow supports retrospective verification-oriented analysis, whereas the
+operational workflow diagnoses forecast evolution from an already identified
+cyclone. See [Operational tropical cyclone workflow](operational_tc_workflow.md)
+for the operational architecture and interpretation rules.
+
 ## Conceptual workflow
 
 ```text
