@@ -212,6 +212,161 @@ def build_track_records(
     return records
 
 
+def dataframe_to_records(
+    dataframe: pd.DataFrame,
+) -> list[TrackRecord]:
+    """
+    Convert a pandas DataFrame to TrackRecord objects.
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame
+        Tabular track representation using the canonical
+        TrackRecord column names.
+
+    Returns
+    -------
+    list[TrackRecord]
+        Track records ordered as supplied in the dataframe.
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError(
+            "dataframe must be a pandas DataFrame."
+        )
+
+    required = {
+        "lead_time_hours",
+        "valid_time",
+        "latitude",
+        "longitude",
+        "pressure",
+    }
+
+    missing = required.difference(
+        dataframe.columns
+    )
+
+    if missing:
+        raise ValueError(
+            "Track dataframe is missing required columns: "
+            + ", ".join(sorted(missing))
+        )
+
+    records: list[TrackRecord] = []
+
+    for _, row in dataframe.iterrows():
+        valid_time = np.datetime64(
+            pd.to_datetime(
+                row["valid_time"]
+            ),
+            "ns",
+        )
+
+        if np.isnat(valid_time):
+            raise ValueError(
+                "Track valid_time cannot be NaT."
+            )
+
+        def optional_value(name):
+            if name not in dataframe.columns:
+                return None
+
+            value = row[name]
+
+            if pd.isna(value):
+                return None
+
+            return value
+
+        records.append(
+            TrackRecord(
+                lead_time_hours=int(
+                    row["lead_time_hours"]
+                ),
+                valid_time=valid_time,
+                latitude=float(
+                    row["latitude"]
+                ),
+                longitude=float(
+                    row["longitude"]
+                ),
+                pressure=float(
+                    row["pressure"]
+                ),
+                pressure_units=optional_value(
+                    "pressure_units"
+                ),
+                max_wind=(
+                    None
+                    if optional_value("max_wind") is None
+                    else float(
+                        optional_value("max_wind")
+                    )
+                ),
+                wind_units=optional_value(
+                    "wind_units"
+                ),
+                distance_km=(
+                    None
+                    if optional_value("distance_km") is None
+                    else float(
+                        optional_value("distance_km")
+                    )
+                ),
+                translation_speed_kmh=(
+                    None
+                    if optional_value(
+                        "translation_speed_kmh"
+                    ) is None
+                    else float(
+                        optional_value(
+                            "translation_speed_kmh"
+                        )
+                    )
+                ),
+                bearing_degrees=(
+                    None
+                    if optional_value(
+                        "bearing_degrees"
+                    ) is None
+                    else float(
+                        optional_value(
+                            "bearing_degrees"
+                        )
+                    )
+                ),
+                cumulative_distance_km=(
+                    0.0
+                    if optional_value(
+                        "cumulative_distance_km"
+                    ) is None
+                    else float(
+                        optional_value(
+                            "cumulative_distance_km"
+                        )
+                    )
+                ),
+            )
+        )
+
+    return records
+
+
+def read_track_records_csv(
+    path,
+) -> list[TrackRecord]:
+    """
+    Read canonical TrackRecord objects from a CSV file.
+    """
+    dataframe = pd.read_csv(
+        path
+    )
+
+    return dataframe_to_records(
+        dataframe
+    )
+
+
 def records_to_dataframe(
     records: list[TrackRecord],
 ) -> pd.DataFrame:

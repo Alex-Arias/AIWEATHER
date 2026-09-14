@@ -14,6 +14,8 @@ from .motion import (
 from .records import (
     TrackRecord,
     build_track_records,
+    dataframe_to_records,
+    read_track_records_csv,
     records_to_dataframe,
     records_to_xarray,
 )
@@ -79,8 +81,10 @@ __all__ = [
     "TrackRecord",
     "build_track_records",
     "classify_track",
+    "dataframe_to_records",
     "great_circle_distance_km",
     "initial_bearing_degrees",
+    "read_track_records_csv",
     "records_to_dataframe",
     "records_to_xarray",
     "export_operational_track",

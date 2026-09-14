@@ -11,6 +11,8 @@ from aiweather.tracking import (
     build_track_records,
     records_to_dataframe,
     records_to_xarray,
+    dataframe_to_records,
+    read_track_records_csv,
 )
 
 
@@ -225,6 +227,114 @@ def test_records_to_dataframe_empty():
 
     assert dataframe.empty
 
+
+def test_dataframe_to_records_round_trip():
+    records = build_track_records(
+        make_track(),
+        initialization_time="2026-07-24T00:00:00",
+    )
+
+    dataframe = records_to_dataframe(
+        records
+    )
+
+    restored = dataframe_to_records(
+        dataframe
+    )
+
+    assert restored == records
+
+
+def test_dataframe_to_records_blank_units_are_none():
+    dataframe = pd.DataFrame(
+        {
+            "lead_time_hours": [0],
+            "valid_time": ["2026-09-05 00:00:00"],
+            "latitude": [20.5],
+            "longitude": [241.25],
+            "pressure": [96724.9375],
+            "pressure_units": [np.nan],
+            "max_wind": [26.873567581176758],
+            "wind_units": [np.nan],
+        }
+    )
+
+    records = dataframe_to_records(
+        dataframe
+    )
+
+    assert records[0].pressure_units is None
+    assert records[0].wind_units is None
+
+
+def test_dataframe_to_records_missing_required_column():
+    dataframe = pd.DataFrame(
+        {
+            "lead_time_hours": [0],
+            "valid_time": ["2026-09-05 00:00:00"],
+            "latitude": [20.5],
+            "longitude": [241.25],
+        }
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="missing required columns",
+    ):
+        dataframe_to_records(
+            dataframe
+        )
+
+
+def test_dataframe_to_records_rejects_invalid_type():
+    with pytest.raises(
+        TypeError,
+        match="pandas DataFrame",
+    ):
+        dataframe_to_records(
+            []
+        )
+
+
+def test_read_track_records_csv(tmp_path):
+    path = tmp_path / "track.csv"
+
+    dataframe = pd.DataFrame(
+        {
+            "lead_time_hours": [0, 6],
+            "valid_time": [
+                "2026-09-05 00:00:00",
+                "2026-09-05 06:00:00",
+            ],
+            "latitude": [20.5, 21.25],
+            "longitude": [241.25, 240.5],
+            "pressure": [96724.9375, 97070.0546875],
+            "pressure_units": [np.nan, np.nan],
+            "max_wind": [
+                26.873567581176758,
+                26.79865074157715,
+            ],
+            "wind_units": [np.nan, np.nan],
+        }
+    )
+
+    dataframe.to_csv(
+        path,
+        index=False,
+    )
+
+    records = read_track_records_csv(
+        path
+    )
+
+    assert len(records) == 2
+    assert records[0].lead_time_hours == 0
+    assert records[1].lead_time_hours == 6
+    assert records[0].pressure == pytest.approx(
+        96724.9375
+    )
+    assert records[0].pressure_units is None
+    assert records[0].wind_units is None
 
 # ---------------------------------------------------------
 # xarray conversion

@@ -54,6 +54,13 @@ from .lead_time import (
     summarize_lead_time_verification,
 )
 
+from .operational import (
+    validate_operational_track_units,
+    verify_operational_track,
+    verify_operational_track_csv,
+)
+
+
 __all__ = [
     "BestTrackPoint",
     "best_track_to_records",
@@ -81,5 +88,7 @@ __all__ = [
     "aggregate_batch_lead_time_verification",
     "assign_lead_time_bins",
     "summarize_lead_time_verification",
-
+    "validate_operational_track_units",
+    "verify_operational_track",
+    "verify_operational_track_csv",
 ]
