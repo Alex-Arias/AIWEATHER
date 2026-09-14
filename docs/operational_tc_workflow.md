@@ -166,6 +166,31 @@ Formal verification requires an independent reference such as finalized best-tra
 
 A model that continues longer than another model under the tracker should likewise not be described as more accurate solely because it has greater tracker coverage.
 
+### 6.2 Forecast-cycle comparison
+
+Forecast cycles for the same tropical cyclone can be compared with
+`scripts/compare_operational_tc_cycles.py`.
+
+The comparator aligns tracks by exact absolute valid time rather than
+equal forecast lead. Same-model cycle displacement therefore measures
+the change in the forecast trajectory between initialization cycles; it
+is a forecast revision diagnostic, not a track error.
+
+The diagnostic writes cycle-displacement and inter-system-spread CSV
+products together with track, displacement, and matched-spread figures.
+For quantitative comparison of spread between cycles, the
+`matched_system_spread` products should be used because they restrict
+both cycles to exactly the same valid-time window.
+
+The `--spread-models` option explicitly selects the systems included in
+inter-system spread. This permits scientifically related configurations
+to remain in the track and cycle-displacement diagnostics without
+counting them as independent consensus members.
+
+Inter-system spread measures deterministic forecast diversity, not
+forecast error or skill. Statements about accuracy or skill require an
+independent reference.
+
 ## 7. AIFS2 storm-relative wave analysis
 
 The operational AIFS2 wave workflow diagnoses the wave field relative to the moving tracked cyclone center.
@@ -243,6 +268,42 @@ The completed deterministic products included AIFS2, GraphCast, Pangu3, and Pang
 
 For AIFS2, maximum SWH within 300 km reached approximately 9.612 m at +48 h. Maximum 10-m wind within 300 km was approximately 26.368 m s-1 at +48 h. The radius-time analysis reached a maximum radial-bin mean SWH of approximately 7.98 m near 75 km radius at +48 h.
 
+#### Marie forecast-cycle experiment
+
+A second Marie experiment was initialized at 0000 UTC 5 September 2026
+using 20.6 degrees N, 118.7 degrees W as the NHC spatial search seed.
+Because that analyzed position was issued at 0300 UTC, the experiment is
+classified as pseudo-operational retrospective.
+
+The 3 September cycle was preserved unchanged as the baseline, while the
+5 September cycle was treated as an independent later-cycle experiment
+for AIFS2, GraphCast, Pangu3, and Pangu6.
+
+Cycle-to-cycle tracks were compared at exact common absolute valid times.
+All four forecast configurations shifted toward substantially more
+poleward later-cycle trajectories as the forecasts evolved. The largest
+cycle displacements occurred in the Pangu configurations. These
+differences represent forecast-cycle revision, not forecast error.
+
+For the inter-system spread calculation, AIFS2, GraphCast, and Pangu3
+were selected explicitly with `--spread-models aifs2 graphcast pangu3`.
+Pangu6 remained in the track-map and cycle-displacement diagnostics but
+was not counted as an additional independent system because Pangu3 and
+Pangu6 are temporal-sampling configurations of the same Pangu workflow.
+
+Across the 23 exact valid times shared by both cycles and the three
+selected systems, from 0000 UTC 5 September through 1200 UTC
+10 September, mean pairwise track spread decreased from approximately
+301.4 km in the 3 September cycle to 151.0 km in the 5 September cycle,
+a reduction of approximately 49.9 percent. Maximum pairwise separation
+over the same matched window decreased from approximately 1032.1 km to
+391.2 km.
+
+The later cycle therefore showed substantially greater deterministic
+inter-system agreement over the matched valid-time window. This does
+not by itself demonstrate improved forecast skill; independent
+best-track verification is required to assess accuracy.
+
 ### 9.3 Lowell
 
 Lowell was initialized at 0000 UTC 3 September 2026.
@@ -301,13 +362,17 @@ A new operational experiment should follow this sequence:
 
 ## 12. Reproducibility
 
-The workflow described here was completed through:
+The Marie/Lowell operational wave workflow was validated at:
 
 ```text
 AIWeather commit: 78b23bb
 Commit description: Support Marie and Lowell operational wave analysis
 Regression status: 466 passed, 88 warnings
 ```
+The subsequent forecast-cycle comparison implementation was validated
+with the full GPU regression suite before commit:
+
+Regression status: 472 passed, 88 warnings
 
 Operational products should retain enough provenance to associate a result with its exact forecast store, tracking configuration, case definition, and source-code checkpoint.
 
