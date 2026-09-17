@@ -9,34 +9,13 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
-MODEL_LABELS = {
-    "graphcast": "GraphCast",
-    "aifs2": "AIFS2",
-    "pangu3": "Pangu3",
-    "pangu6": "Pangu6",
-}
-
-MARKERS = {
-    "graphcast": "s",
-    "aifs2": "^",
-    "pangu3": "D",
-    "pangu6": "o",
-}
-
-LINESTYLES = {
-    "graphcast": "-",
-    "aifs2": "-",
-    "pangu3": "-",
-    "pangu6": "--",
-}
-
-MODEL_ORDER = [
-    "graphcast",
-    "aifs2",
-    "pangu3",
-    "pangu6",
-]
+from aiweather.plotting.model_style import (
+    model_color,
+    model_label,
+    model_linestyle,
+    model_marker,
+    model_sort_key,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -71,15 +50,6 @@ def parse_args() -> argparse.Namespace:
     )
 
     return parser.parse_args()
-
-
-def model_sort_key(model: str) -> tuple[int, str]:
-    try:
-        index = MODEL_ORDER.index(model)
-    except ValueError:
-        index = len(MODEL_ORDER)
-
-    return index, model
 
 
 def load_common_verification(
@@ -179,33 +149,6 @@ def validate_common_times(
             )
 
 
-def label_for_model(
-    model: str,
-) -> str:
-    return MODEL_LABELS.get(
-        model,
-        model,
-    )
-
-
-def marker_for_model(
-    model: str,
-) -> str:
-    return MARKERS.get(
-        model,
-        "o",
-    )
-
-
-def linestyle_for_model(
-    model: str,
-) -> str:
-    return LINESTYLES.get(
-        model,
-        "-",
-    )
-
-
 def save_figure(
     fig,
     output_dir: Path,
@@ -255,15 +198,18 @@ def plot_track_error(
         ax.plot(
             table["lead_time_hours"],
             table["track_error_km"],
-            marker=marker_for_model(
+            marker=model_marker(
                 model
             ),
-            linestyle=linestyle_for_model(
+            linestyle=model_linestyle(
                 model
             ),
             markersize=5,
             linewidth=2,
-            label=label_for_model(
+            color=model_color(
+                model
+            ),
+            label=model_label(
                 model
             ),
         )
@@ -318,15 +264,18 @@ def plot_pressure_error(
         ax.plot(
             table["lead_time_hours"],
             pressure_error_hpa,
-            marker=marker_for_model(
+            marker=model_marker(
                 model
             ),
-            linestyle=linestyle_for_model(
+            linestyle=model_linestyle(
                 model
             ),
             markersize=5,
             linewidth=2,
-            label=label_for_model(
+            color=model_color(
+                model
+            ),
+            label=model_label(
                 model
             ),
         )
@@ -380,15 +329,18 @@ def plot_wind_error(
         ax.plot(
             table["lead_time_hours"],
             table["wind_error_ms"],
-            marker=marker_for_model(
+            marker=model_marker(
                 model
             ),
-            linestyle=linestyle_for_model(
+            linestyle=model_linestyle(
                 model
             ),
             markersize=5,
             linewidth=2,
-            label=label_for_model(
+            color=model_color(
+                model
+            ),
+            label=model_label(
                 model
             ),
         )

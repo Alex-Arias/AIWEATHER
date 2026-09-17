@@ -33,6 +33,12 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+
+from aiweather.plotting.model_style import (
+    model_color,
+    model_label,
+    model_marker,
+)
 import numpy as np
 import pandas as pd
 
@@ -111,18 +117,6 @@ PAIRS = [
         "pangu3",
     ),
 ]
-
-MODEL_LABELS = {
-    "graphcast": "GraphCast",
-    "aifs2": "AIFS2",
-    "pangu3": "Pangu3",
-}
-
-MARKERS = {
-    "graphcast": "s",
-    "aifs2": "^",
-    "pangu3": "D",
-}
 
 LEAD_TICKS = [
     0,
@@ -615,7 +609,7 @@ for model, path in MODEL_PATHS.items():
     )
 
     print(
-        f"{MODEL_LABELS[model]:<10s}: "
+        f"{model_label(model):<10s}: "
         f"{len(data[model])} "
         "full WuDuan points"
     )
@@ -842,23 +836,20 @@ for row_index, (
                     subset[
                         f"track_error_km_{model}"
                     ],
-                    marker=MARKERS[
-                        model
-                    ],
+                    marker=model_marker(model),
                     markersize=4,
                     linewidth=1.8,
-                    label=MODEL_LABELS[
-                        model
-                    ],
+                    color=model_color(model),
+                    label=model_label(model),
                 )
 
         if row_index == 0:
 
             ax.set_title(
                 (
-                    f"{MODEL_LABELS[model_left]} "
+                    f"{model_label(model_left)} "
                     f"vs "
-                    f"{MODEL_LABELS[model_right]}"
+                    f"{model_label(model_right)}"
                 ),
                 fontweight="bold",
             )
@@ -1003,13 +994,10 @@ if not genevieve.empty:
             genevieve[
                 f"forecast_latitude_{model}"
             ],
-            marker=MARKERS[
-                model
-            ],
+            marker=model_marker(model),
             linewidth=2,
-            label=MODEL_LABELS[
-                model
-            ],
+            color=model_color(model),
+            label=model_label(model),
         )
 
     ax.set_xlabel(
@@ -1052,13 +1040,10 @@ if not genevieve.empty:
             genevieve[
                 f"track_error_km_{model}"
             ],
-            marker=MARKERS[
-                model
-            ],
+            marker=model_marker(model),
             linewidth=2,
-            label=MODEL_LABELS[
-                model
-            ],
+            color=model_color(model),
+            label=model_label(model),
         )
 
     ax.set_xlabel(
@@ -1104,13 +1089,10 @@ if not genevieve.empty:
                 ]
                 / 100.0
             ),
-            marker=MARKERS[
-                model
-            ],
+            marker=model_marker(model),
             linewidth=2,
-            label=MODEL_LABELS[
-                model
-            ],
+            color=model_color(model),
+            label=model_label(model),
         )
 
     ax.axhline(
@@ -1158,13 +1140,10 @@ if not genevieve.empty:
             genevieve[
                 f"wind_error_ms_{model}"
             ],
-            marker=MARKERS[
-                model
-            ],
+            marker=model_marker(model),
             linewidth=2,
-            label=MODEL_LABELS[
-                model
-            ],
+            color=model_color(model),
+            label=model_label(model),
         )
 
     ax.axhline(
@@ -1322,9 +1301,7 @@ if not genevieve_summary.empty:
     ]:
 
         print(
-            MODEL_LABELS[
-                model
-            ]
+            model_label(model)
         )
 
         print(

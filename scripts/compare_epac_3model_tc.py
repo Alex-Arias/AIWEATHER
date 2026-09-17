@@ -26,6 +26,12 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+
+from aiweather.plotting.model_style import (
+    model_color,
+    model_label,
+    model_marker,
+)
 import numpy as np
 import pandas as pd
 
@@ -51,12 +57,6 @@ MODEL_PATHS = {
         "pangu3_epac_5storm/"
         "batch_points.csv"
     ),
-}
-
-MODEL_LABELS = {
-    "graphcast": "GraphCast",
-    "aifs2": "AIFS2",
-    "pangu3": "Pangu3",
 }
 
 STORMS = [
@@ -351,7 +351,7 @@ for model, path in MODEL_PATHS.items():
     )
 
     print(
-        f"{MODEL_LABELS[model]:<10s}: "
+        f"{model_label(model):<10s}: "
         f"{len(model_data[model])} "
         "full WuDuan points"
     )
@@ -951,12 +951,6 @@ axes = np.asarray(
     axes
 ).ravel()
 
-markers = {
-    "graphcast": "s",
-    "aifs2": "^",
-    "pangu3": "D",
-}
-
 for ax, (
     case_id,
     storm_name,
@@ -1015,14 +1009,17 @@ for ax, (
             subset[
                 f"forecast_latitude_{model}"
             ],
-            marker=markers[
+            marker=model_marker(
                 model
-            ],
+            ),
             markersize=3.5,
             linewidth=1.9,
-            label=MODEL_LABELS[
+            color=model_color(
                 model
-            ],
+            ),
+            label=model_label(
+                model
+            ),
         )
 
     ax.set_title(
@@ -1142,14 +1139,17 @@ for ax, (
                         model
                     ]
                 ],
-                marker=markers[
+                marker=model_marker(
                     model
-                ],
+                ),
                 markersize=4,
                 linewidth=2,
-                label=MODEL_LABELS[
+                color=model_color(
                     model
-                ],
+                ),
+                label=model_label(
+                    model
+                ),
             )
 
     ax.set_title(
@@ -1270,9 +1270,12 @@ for offset, model in zip(
             f"{model}_mean_error_km"
         ],
         width,
-        label=MODEL_LABELS[
+        color=model_color(
             model
-        ],
+        ),
+        label=model_label(
+            model
+        ),
     )
 
 
@@ -1378,14 +1381,17 @@ for ax, (
                     "lead_time_hours"
                 ],
                 pressure_error_hpa,
-                marker=markers[
+                marker=model_marker(
                     model
-                ],
+                ),
                 markersize=4,
                 linewidth=2,
-                label=MODEL_LABELS[
+                color=model_color(
                     model
-                ],
+                ),
+                label=model_label(
+                    model
+                ),
             )
 
     ax.axhline(
@@ -1521,14 +1527,17 @@ for ax, (
                 subset[
                     f"wind_error_ms_{model}"
                 ],
-                marker=markers[
+                marker=model_marker(
                     model
-                ],
+                ),
                 markersize=4,
                 linewidth=2,
-                label=MODEL_LABELS[
+                color=model_color(
                     model
-                ],
+                ),
+                label=model_label(
+                    model
+                ),
             )
 
     ax.axhline(
@@ -1681,9 +1690,9 @@ for model in [
     intensity_rows.append(
         {
             "Model":
-                MODEL_LABELS[
+                model_label(
                     model
-                ],
+                ),
 
             "P Bias (hPa)":
                 robust_row[

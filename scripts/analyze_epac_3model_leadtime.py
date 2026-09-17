@@ -35,6 +35,11 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+
+from aiweather.plotting.model_style import (
+    model_color,
+    model_label,
+)
 import numpy as np
 import pandas as pd
 
@@ -69,18 +74,6 @@ MODELS = [
     "aifs2",
     "pangu3",
 ]
-
-MODEL_LABELS = {
-    "graphcast": "GraphCast",
-    "aifs2": "AIFS2",
-    "pangu3": "Pangu3",
-}
-
-MARKERS = {
-    "graphcast": "s",
-    "aifs2": "^",
-    "pangu3": "D",
-}
 
 # ------------------------------------------------------------
 # Lead-time bins
@@ -380,9 +373,9 @@ for lead_bin in LEAD_BINS:
                     model,
 
                 "model_label":
-                    MODEL_LABELS[
+                    model_label(
                         model
-                    ],
+                    ),
 
                 "common_points":
                     len(
@@ -616,9 +609,12 @@ for offset, model in zip(
         x + offset,
         values,
         width,
-        label=MODEL_LABELS[
+        color=model_color(
             model
-        ],
+        ),
+        label=model_label(
+            model
+        ),
     )
 
 
@@ -724,9 +720,12 @@ for offset, model in zip(
         x + offset,
         values,
         width,
-        label=MODEL_LABELS[
+        color=model_color(
             model
-        ],
+        ),
+        label=model_label(
+            model
+        ),
     )
 
 
@@ -832,9 +831,12 @@ for offset, model in zip(
         x + offset,
         values,
         width,
-        label=MODEL_LABELS[
+        color=model_color(
             model
-        ],
+        ),
+        label=model_label(
+            model
+        ),
     )
 
 

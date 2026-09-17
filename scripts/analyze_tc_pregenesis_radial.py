@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from aiweather.plotting.model_style import model_label
 from aiweather.verification.ibtracs import read_ibtracs_csv
 from aiweather.verification.best_track import best_track_to_records
 
@@ -28,12 +29,6 @@ DEFAULT_MODELS = [
     "aifs2",
     "pangu3",
 ]
-
-MODEL_LABELS = {
-    "graphcast": "GraphCast",
-    "aifs2": "AIFS2",
-    "pangu3": "Pangu3",
-}
 
 
 def parse_args():
@@ -678,10 +673,7 @@ def main():
             print()
             print("=" * 112)
             print(
-                MODEL_LABELS.get(
-                    model,
-                    model,
-                ).upper()
+                model_label(model).upper()
             )
             print("=" * 112)
 
@@ -726,10 +718,7 @@ def main():
         print()
         print("=" * 112)
         print(
-            MODEL_LABELS.get(
-                model,
-                model,
-            ).upper()
+            model_label(model).upper()
         )
         print("=" * 112)
 
@@ -929,10 +918,7 @@ def main():
                     ),
                     "model": model,
                     "model_label": (
-                        MODEL_LABELS.get(
-                            model,
-                            model,
-                        )
+                        model_label(model)
                     ),
                     "lead_time_hours": lead,
                     "valid_time": str(
@@ -1019,10 +1005,7 @@ def main():
             )
         ]
 
-        label = MODEL_LABELS.get(
-            model,
-            model,
-        )
+        label = model_label(model)
 
         if subset.empty:
             print()

@@ -24,6 +24,11 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+
+from aiweather.plotting.model_style import (
+    model_color,
+    model_sort_key,
+)
 import numpy as np
 import pandas as pd
 
@@ -177,7 +182,8 @@ def build_cycle_displacement(
     summary_rows = []
 
     common_models = sorted(
-        set(baseline) & set(later)
+        set(baseline) & set(later),
+        key=model_sort_key,
     )
 
     for model in common_models:
@@ -673,19 +679,14 @@ def plot_cycle_track_map(
     all_latitudes = []
 
     common_models = sorted(
-        set(baseline) & set(later)
+        set(baseline) & set(later),
+        key=model_sort_key,
     )
 
-    colors = plt.rcParams[
-        "axes.prop_cycle"
-    ].by_key()["color"]
-
-    for index, model in enumerate(
-        common_models
-    ):
-        color = colors[
-            index % len(colors)
-        ]
+    for model in common_models:
+        color = model_color(
+            model
+        )
 
         for cycle_name, tracks, linestyle in [
             (baseline_label, baseline, "--"),

@@ -43,6 +43,8 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+
+from aiweather.plotting.model_style import model_label
 import numpy as np
 import pandas as pd
 
@@ -82,12 +84,6 @@ MODELS = [
     "aifs2",
     "pangu3",
 ]
-
-MODEL_LABELS = {
-    "graphcast": "GraphCast",
-    "aifs2": "AIFS2",
-    "pangu3": "Pangu3",
-}
 
 PAIRS = [
     (
@@ -629,17 +625,17 @@ def save_ci_figure(
 
         for _, row in section.iterrows():
 
-            left = MODEL_LABELS[
+            left = model_label(
                 row[
                     "model_left"
                 ]
-            ]
+            )
 
-            right = MODEL_LABELS[
+            right = model_label(
                 row[
                     "model_right"
                 ]
-            ]
+            )
 
             labels.append(
                 f"{left} - {right}"
