@@ -20,6 +20,12 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+
+from aiweather.plotting.model_style import (
+    model_color,
+    model_label,
+    model_marker,
+)
 import numpy as np
 import pandas as pd
 
@@ -736,10 +742,11 @@ for ax, (
         gc[
             "forecast_latitude"
         ],
-        marker="s",
+        marker=model_marker("graphcast"),
         markersize=4,
         linewidth=1.8,
-        label="GraphCast",
+        color=model_color("graphcast"),
+        label=model_label("graphcast"),
     )
 
     ax.plot(
@@ -749,22 +756,23 @@ for ax, (
         ai[
             "forecast_latitude"
         ],
-        marker="^",
+        marker=model_marker("aifs2"),
         markersize=4,
         linewidth=1.8,
-        label="AIFS2",
+        color=model_color("aifs2"),
+        label=model_label("aifs2"),
     )
 
     add_lead_annotations(
         ax,
         gc,
-        "s",
+        model_marker("graphcast"),
     )
 
     add_lead_annotations(
         ax,
         ai,
-        "^",
+        model_marker("aifs2"),
     )
 
     ax.set_title(
@@ -848,10 +856,11 @@ for ax, (
         gc[
             "track_error_km"
         ],
-        marker="o",
+        marker=model_marker("graphcast"),
         markersize=4,
         linewidth=2,
-        label="GraphCast",
+        color=model_color("graphcast"),
+        label=model_label("graphcast"),
     )
 
     ax.plot(
@@ -861,10 +870,11 @@ for ax, (
         ai[
             "track_error_km"
         ],
-        marker="s",
+        marker=model_marker("aifs2"),
         markersize=4,
         linewidth=2,
-        label="AIFS2",
+        color=model_color("aifs2"),
+        label=model_label("aifs2"),
     )
 
     ax.set_title(
@@ -1094,10 +1104,11 @@ for ax, (
         gc[
             "forecast_latitude"
         ],
-        marker="s",
+        marker=model_marker("graphcast"),
         markersize=4,
         linewidth=1.8,
-        label="GraphCast Native",
+        color=model_color("graphcast"),
+        label=f'{model_label("graphcast")} Native',
     )
 
     ax.plot(
@@ -1107,22 +1118,23 @@ for ax, (
         ai[
             "forecast_latitude"
         ],
-        marker="^",
+        marker=model_marker("aifs2"),
         markersize=4,
         linewidth=1.8,
-        label="AIFS2 Native",
+        color=model_color("aifs2"),
+        label=f'{model_label("aifs2")} Native',
     )
 
     add_lead_annotations(
         ax,
         gc,
-        "s",
+        model_marker("graphcast"),
     )
 
     add_lead_annotations(
         ax,
         ai,
-        "^",
+        model_marker("aifs2"),
     )
 
     ax.set_title(
@@ -1252,9 +1264,10 @@ for ax, (
         ],
         linestyle="--",
         linewidth=1.8,
-        marker="o",
+        marker=model_marker("graphcast"),
         markersize=3.5,
-        label="GraphCast — Native",
+        color=model_color("graphcast"),
+        label=f'{model_label("graphcast")} — Native',
     )
 
     ax.plot(
@@ -1266,9 +1279,10 @@ for ax, (
         ],
         linestyle="-",
         linewidth=2.0,
-        marker="s",
+        marker=model_marker("graphcast"),
         markersize=3.5,
-        label="GraphCast — WuDuan",
+        color=model_color("graphcast"),
+        label=f'{model_label("graphcast")} — WuDuan',
     )
 
     # --------------------------------------------------------
@@ -1284,9 +1298,10 @@ for ax, (
         ],
         linestyle="--",
         linewidth=1.8,
-        marker="^",
+        marker=model_marker("aifs2"),
         markersize=3.5,
-        label="AIFS2 — Native",
+        color=model_color("aifs2"),
+        label=f'{model_label("aifs2")} — Native',
     )
 
     ax.plot(
@@ -1298,9 +1313,10 @@ for ax, (
         ],
         linestyle="-",
         linewidth=2.0,
-        marker="D",
+        marker=model_marker("aifs2"),
         markersize=3.5,
-        label="AIFS2 — WuDuan",
+        color=model_color("aifs2"),
+        label=f'{model_label("aifs2")} — WuDuan',
     )
 
     # --------------------------------------------------------
@@ -1433,10 +1449,11 @@ for ax, (
         gc[
             "track_error_km"
         ],
-        marker="o",
+        marker=model_marker("graphcast"),
         markersize=4,
         linewidth=2,
-        label="GraphCast Native",
+        color=model_color("graphcast"),
+        label=f'{model_label("graphcast")} Native',
     )
 
     ax.plot(
@@ -1446,10 +1463,11 @@ for ax, (
         ai[
             "track_error_km"
         ],
-        marker="s",
+        marker=model_marker("aifs2"),
         markersize=4,
         linewidth=2,
-        label="AIFS2 Native",
+        color=model_color("aifs2"),
+        label=f'{model_label("aifs2")} Native',
     )
 
     ax.set_title(
@@ -1535,19 +1553,19 @@ fig, axes = plt.subplots(
 
 model_rows = [
     (
-        "GraphCast",
+        "graphcast",
         graphcast_native,
         graphcast_wuduan,
     ),
     (
-        "AIFS2",
+        "aifs2",
         aifs2_native,
         aifs2_wuduan,
     ),
 ]
 
 for row_index, (
-    model_label,
+    model,
     native_data,
     wuduan_data,
 ) in enumerate(
@@ -1583,10 +1601,11 @@ for row_index, (
             native[
                 "track_error_km"
             ],
-            marker="o",
+            marker=model_marker(model),
             markersize=3.5,
             linewidth=1.8,
             linestyle="--",
+            color=model_color(model),
             label="Native",
         )
 
@@ -1597,10 +1616,11 @@ for row_index, (
             wuduan[
                 "track_error_km"
             ],
-            marker="s",
+            marker=model_marker(model),
             markersize=3.5,
             linewidth=2,
             linestyle="-",
+            color=model_color(model),
             label="WuDuan",
         )
 
@@ -1662,7 +1682,7 @@ for row_index, (
 
         if column_index == 0:
             ax.set_ylabel(
-                f"{model_label}\n"
+                f"{model_label(model)}\n"
                 "Track error (km)"
             )
 
