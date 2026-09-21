@@ -71,6 +71,7 @@ from .workflow import (
 )
 
 from .export import (
+    export_native_genesis_case,
     export_operational_track,
 )
 
@@ -87,6 +88,7 @@ __all__ = [
     "read_track_records_csv",
     "records_to_dataframe",
     "records_to_xarray",
+    "export_native_genesis_case",
     "export_operational_track",
     "track_motion",
     "track_pressure_minimum",

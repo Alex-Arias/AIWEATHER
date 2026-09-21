@@ -6,10 +6,11 @@ import pandas as pd
 
 from aiweather.forecast import ForecastMetadata
 from aiweather.tracking import (
+    GenesisResult,
     TrackRecord,
+    export_native_genesis_case,
     export_operational_track,
 )
-
 
 def test_export_operational_track(tmp_path):
     records = [
@@ -214,4 +215,156 @@ def test_export_operational_track_empty_records(
             "maximum_translation_speed_mps"
         ]
         is None
+    )
+
+def test_export_native_genesis_case(tmp_path):
+    genesis = GenesisResult(
+        track_index=2,
+        genesis_lead_time_hours=72,
+        latitude=15.0,
+        longitude=257.5,
+        pressure=99332.0,
+        max_wind=18.7,
+        qualifying_points=6,
+    )
+
+    records = [
+        TrackRecord(
+            lead_time_hours=72,
+            valid_time=np.datetime64(
+                "2026-09-23T12:00:00"
+            ),
+            latitude=15.0,
+            longitude=257.5,
+            pressure=99332.0,
+            pressure_units="Pa",
+            max_wind=18.7,
+            wind_units="m/s",
+        ),
+        TrackRecord(
+            lead_time_hours=78,
+            valid_time=np.datetime64(
+                "2026-09-23T18:00:00"
+            ),
+            latitude=15.25,
+            longitude=257.0,
+            pressure=99250.0,
+            pressure_units="Pa",
+            max_wind=19.2,
+            wind_units="m/s",
+        ),
+    ]
+
+    metadata = ForecastMetadata(
+        model_name="pangu6",
+        model_version="unknown",
+        backend="earth2studio",
+        forecast_id=(
+            "pangu6_gfs_"
+            "20260920T120000_240h"
+        ),
+        initialization_time=datetime(
+            2026, 9, 20, 12
+        ),
+    )
+
+    track_path, provenance_path = (
+        export_native_genesis_case(
+            genesis,
+            records,
+            tmp_path,
+            filename="pangu6_track.csv",
+            forecast_path="forecast.zarr",
+            forecast_metadata=metadata,
+            case_id=(
+                "epac_candidate_"
+                "20260920T120000"
+            ),
+            case_name=None,
+            experiment_type=(
+                "prospective-genesis"
+            ),
+            lat_min=5.0,
+            lat_max=25.0,
+            lon_min=-115.0,
+            lon_max=-95.0,
+            candidate_lead_min_hours=24,
+            candidate_lead_max_hours=174,
+            candidate_interval_hours=6,
+            max_candidates=5,
+            minimum_separation_km=500.0,
+            maximum_displacement_km=500.0,
+            minimum_wind=17.0,
+            maximum_pressure=100500.0,
+            minimum_consecutive_points=3,
+            wind_radius_km=300.0,
+            search_radius_km=500.0,
+            datasource="gfs",
+            datasource_source="aws",
+            git_commit="testcommit",
+        )
+    )
+
+    dataframe = pd.read_csv(track_path)
+
+    assert len(dataframe) == 2
+    assert (
+        list(dataframe["lead_time_hours"])
+        == [72, 78]
+    )
+
+    with provenance_path.open(
+        encoding="utf-8"
+    ) as handle:
+        manifest = json.load(handle)
+
+    assert manifest["schema_version"] == 1
+    assert (
+        manifest["experiment_type"]
+        == "prospective-genesis"
+    )
+    assert (
+        manifest["case"]["id"]
+        == "epac_candidate_20260920T120000"
+    )
+
+    detection = manifest[
+        "genesis_detection"
+    ]
+
+    assert (
+        detection[
+            "candidate_lead_min_hours"
+        ]
+        == 24
+    )
+    assert (
+        detection[
+            "candidate_lead_max_hours"
+        ]
+        == 174
+    )
+    assert (
+        detection["result"][
+            "genesis_lead_time_hours"
+        ]
+        == 72
+    )
+    assert (
+        detection["result"][
+            "qualifying_points"
+        ]
+        == 6
+    )
+
+    tracking = manifest[
+        "post_genesis_tracking"
+    ]
+
+    assert tracking["number_of_points"] == 2
+    assert tracking["last_lead_time_hours"] == 78
+
+    assert (
+        manifest["software"]["git_commit"]
+        == "testcommit"
     )
