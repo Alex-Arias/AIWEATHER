@@ -67,6 +67,7 @@ from .workflow import (
     TrackingWorkflowResult,
     build_existing_tc_track,
     build_native_tc_track,
+    build_native_tc_tracks,
     evaluate_forecast_trackers,
 )
 
@@ -115,6 +116,7 @@ __all__ = [
     "TrackingWorkflowResult",
     "build_existing_tc_track",
     "build_native_tc_track",
+    "build_native_tc_tracks",
     "evaluate_forecast_trackers",
 
 ]

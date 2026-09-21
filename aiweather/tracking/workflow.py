@@ -102,7 +102,7 @@ def build_existing_tc_track(
     )
 
 
-def build_native_tc_track(
+def _detect_native_genesis(
     forecast: Forecast,
     *,
     lat_min: float,
@@ -119,23 +119,15 @@ def build_native_tc_track(
     maximum_pressure: float = 100500.0,
     minimum_consecutive_points: int = 3,
     wind_radius_km: float = 300.0,
-    search_radius_km: float = 500.0,
-) -> tuple[
-    GenesisResult,
-    list[TrackRecord],
-]:
+):
     """
-    Build the native AIWeather tropical cyclone track.
+    Detect native tropical-cyclone genesis candidates.
 
-    Returns
-    -------
-    GenesisResult
-        Selected genesis result.
-
-    list[TrackRecord]
-        Native AIWeather tropical cyclone track records.
+    Returns the selected forecast region together with all qualifying
+    genesis results. Candidate association is restricted to the
+    configured candidate interval so stale tracks cannot capture
+    later pressure minima.
     """
-
     region = forecast.select_region(
         lat_min=lat_min,
         lat_max=lat_max,
@@ -206,6 +198,176 @@ def build_native_tc_track(
         wind_radius_km=wind_radius_km,
     )
 
+    return region, genesis_results
+
+
+def build_native_tc_tracks(
+    forecast: Forecast,
+    *,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    candidate_lead_min_hours: int = 24,
+    candidate_lead_max_hours: int = 174,
+    candidate_interval_hours: int = 6,
+    max_candidates: int = 5,
+    minimum_separation_km: float = 500.0,
+    maximum_displacement_km: float = 500.0,
+    minimum_wind: float = 17.0,
+    maximum_pressure: float = 100500.0,
+    minimum_consecutive_points: int = 3,
+    wind_radius_km: float = 300.0,
+    search_radius_km: float = 500.0,
+    maximum_translation_speed_mps: float | None = None,
+) -> list[
+    tuple[
+        GenesisResult,
+        list[TrackRecord],
+    ]
+]:
+    """
+    Build native tracks for all detected tropical-cyclone genesis
+    systems in the selected forecast region.
+
+    Each qualifying GenesisResult is tracked independently from its
+    detected genesis position and lead time.
+    """
+    region, genesis_results = _detect_native_genesis(
+        forecast,
+        lat_min=lat_min,
+        lat_max=lat_max,
+        lon_min=lon_min,
+        lon_max=lon_max,
+        candidate_lead_min_hours=(
+            candidate_lead_min_hours
+        ),
+        candidate_lead_max_hours=(
+            candidate_lead_max_hours
+        ),
+        candidate_interval_hours=(
+            candidate_interval_hours
+        ),
+        max_candidates=max_candidates,
+        minimum_separation_km=(
+            minimum_separation_km
+        ),
+        maximum_displacement_km=(
+            maximum_displacement_km
+        ),
+        minimum_wind=minimum_wind,
+        maximum_pressure=maximum_pressure,
+        minimum_consecutive_points=(
+            minimum_consecutive_points
+        ),
+        wind_radius_km=wind_radius_km,
+    )
+
+    if not genesis_results:
+        raise RuntimeError(
+            "No tropical cyclone genesis was detected "
+            "in the selected forecast region."
+        )
+
+    initialization_time = (
+        forecast.metadata.initialization_time
+    )
+
+    if initialization_time is None:
+        raise ValueError(
+            "Forecast initialization_time metadata "
+            "is required for track records."
+        )
+
+    results = []
+
+    for genesis in genesis_results:
+        native_track = track_from_genesis(
+            region["msl"],
+            genesis=genesis,
+            u_wind=region["u10m"],
+            v_wind=region["v10m"],
+            search_radius_km=search_radius_km,
+            wind_radius_km=wind_radius_km,
+            maximum_translation_speed_mps=(
+                maximum_translation_speed_mps
+            ),
+        )
+
+        native_records = build_track_records(
+            native_track,
+            initialization_time=initialization_time,
+        )
+
+        results.append(
+            (
+                genesis,
+                native_records,
+            )
+        )
+
+    return results
+
+
+def build_native_tc_track(
+    forecast: Forecast,
+    *,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    candidate_lead_min_hours: int = 24,
+    candidate_lead_max_hours: int = 174,
+    candidate_interval_hours: int = 6,
+    max_candidates: int = 5,
+    minimum_separation_km: float = 500.0,
+    maximum_displacement_km: float = 500.0,
+    minimum_wind: float = 17.0,
+    maximum_pressure: float = 100500.0,
+    minimum_consecutive_points: int = 3,
+    wind_radius_km: float = 300.0,
+    search_radius_km: float = 500.0,
+    maximum_translation_speed_mps: float | None = None,
+) -> tuple[
+    GenesisResult,
+    list[TrackRecord],
+]:
+    """
+    Build the first native AIWeather tropical cyclone track.
+
+    When multiple qualifying genesis systems are detected, the
+    existing select_first_genesis policy is retained.
+    """
+    region, genesis_results = _detect_native_genesis(
+        forecast,
+        lat_min=lat_min,
+        lat_max=lat_max,
+        lon_min=lon_min,
+        lon_max=lon_max,
+        candidate_lead_min_hours=(
+            candidate_lead_min_hours
+        ),
+        candidate_lead_max_hours=(
+            candidate_lead_max_hours
+        ),
+        candidate_interval_hours=(
+            candidate_interval_hours
+        ),
+        max_candidates=max_candidates,
+        minimum_separation_km=(
+            minimum_separation_km
+        ),
+        maximum_displacement_km=(
+            maximum_displacement_km
+        ),
+        minimum_wind=minimum_wind,
+        maximum_pressure=maximum_pressure,
+        minimum_consecutive_points=(
+            minimum_consecutive_points
+        ),
+        wind_radius_km=wind_radius_km,
+    )
+
     genesis = select_first_genesis(
         genesis_results
     )
@@ -223,6 +385,9 @@ def build_native_tc_track(
         v_wind=region["v10m"],
         search_radius_km=search_radius_km,
         wind_radius_km=wind_radius_km,
+        maximum_translation_speed_mps=(
+            maximum_translation_speed_mps
+        ),
     )
 
     initialization_time = (
@@ -244,6 +409,7 @@ def build_native_tc_track(
         genesis,
         native_records,
     )
+
 
 def evaluate_forecast_trackers(
     forecast: Forecast,

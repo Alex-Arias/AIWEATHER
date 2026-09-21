@@ -7,6 +7,7 @@ from aiweather.tracking.records import TrackRecord
 from aiweather.tracking.workflow import (
     build_existing_tc_track,
     build_native_tc_track,
+    build_native_tc_tracks,
 )
 
 
@@ -194,9 +195,18 @@ def test_build_native_tc_track(
         lambda *args, **kwargs: genesis,
     )
 
+    captured = {}
+
+    def fake_track_from_genesis(
+        *args,
+        **kwargs,
+    ):
+        captured.update(kwargs)
+        return ["native-track"]
+
     monkeypatch.setattr(
         "aiweather.tracking.workflow.track_from_genesis",
-        lambda *args, **kwargs: ["native-track"],
+        fake_track_from_genesis,
     )
 
     monkeypatch.setattr(
@@ -212,10 +222,14 @@ def test_build_native_tc_track(
         lon_max=-90.0,
         candidate_lead_min_hours=24,
         candidate_lead_max_hours=30,
+        maximum_translation_speed_mps=20.0,
     )
 
     assert result_genesis is genesis
     assert records is expected_records
+    assert captured[
+        "maximum_translation_speed_mps"
+    ] == 20.0
 
 
 def test_build_native_tc_track_no_genesis(
@@ -690,4 +704,161 @@ def test_evaluate_forecast_trackers_no_native_genesis_without_external_reference
             lat_max=35.0,
             lon_min=-150.0,
             lon_max=-100.0,
+        )
+
+
+def test_build_native_tc_tracks(
+    monkeypatch,
+):
+    genesis_a = GenesisResult(
+        track_index=0,
+        genesis_lead_time_hours=60,
+        latitude=15.25,
+        longitude=230.50,
+        pressure=99537.0,
+        max_wind=17.59,
+        qualifying_points=11,
+    )
+
+    genesis_b = GenesisResult(
+        track_index=1,
+        genesis_lead_time_hours=60,
+        latitude=15.50,
+        longitude=256.50,
+        pressure=99288.0,
+        max_wind=17.48,
+        qualifying_points=20,
+    )
+
+    records_a = [
+        TrackRecord(
+            lead_time_hours=60,
+            valid_time=np.datetime64(
+                "2026-07-26T12:00:00"
+            ),
+            latitude=15.25,
+            longitude=230.50,
+            pressure=99537.0,
+            pressure_units="Pa",
+            max_wind=17.59,
+            wind_units="m/s",
+        )
+    ]
+
+    records_b = [
+        TrackRecord(
+            lead_time_hours=60,
+            valid_time=np.datetime64(
+                "2026-07-26T12:00:00"
+            ),
+            latitude=15.50,
+            longitude=256.50,
+            pressure=99288.0,
+            pressure_units="Pa",
+            max_wind=17.48,
+            wind_units="m/s",
+        )
+    ]
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow._detect_native_genesis",
+        lambda *args, **kwargs: (
+            DummyRegion(),
+            [
+                genesis_a,
+                genesis_b,
+            ],
+        ),
+    )
+
+    captured_genesis = []
+
+    def fake_track_from_genesis(
+        pressure,
+        *,
+        genesis,
+        **kwargs,
+    ):
+        captured_genesis.append(genesis)
+
+        if genesis is genesis_a:
+            return ["track-a"]
+
+        if genesis is genesis_b:
+            return ["track-b"]
+
+        raise AssertionError(
+            "Unexpected genesis result."
+        )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow.track_from_genesis",
+        fake_track_from_genesis,
+    )
+
+    def fake_build_track_records(
+        track,
+        *,
+        initialization_time,
+    ):
+        if track == ["track-a"]:
+            return records_a
+
+        if track == ["track-b"]:
+            return records_b
+
+        raise AssertionError(
+            "Unexpected native track."
+        )
+
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow.build_track_records",
+        fake_build_track_records,
+    )
+
+    results = build_native_tc_tracks(
+        DummyForecast(),
+        lat_min=5.0,
+        lat_max=35.0,
+        lon_min=-140.0,
+        lon_max=-90.0,
+    )
+
+    assert len(results) == 2
+
+    assert results[0][0] is genesis_a
+    assert results[0][1] is records_a
+
+    assert results[1][0] is genesis_b
+    assert results[1][1] is records_b
+
+    assert captured_genesis == [
+        genesis_a,
+        genesis_b,
+    ]
+
+
+def test_build_native_tc_tracks_no_genesis(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "aiweather.tracking.workflow._detect_native_genesis",
+        lambda *args, **kwargs: (
+            DummyRegion(),
+            [],
+        ),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "No tropical cyclone genesis was detected"
+        ),
+    ):
+        build_native_tc_tracks(
+            DummyForecast(),
+            lat_min=5.0,
+            lat_max=35.0,
+            lon_min=-140.0,
+            lon_max=-90.0,
         )

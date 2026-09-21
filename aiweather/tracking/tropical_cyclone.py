@@ -516,6 +516,7 @@ def track_from_genesis(
     v_wind: xr.DataArray | None = None,
     search_radius_km: float = 500.0,
     wind_radius_km: float = 300.0,
+    maximum_translation_speed_mps: float | None = None,
 ) -> list[TrackPoint]:
     """
     Track a pressure minimum beginning from a detected genesis point.
@@ -538,6 +539,12 @@ def track_from_genesis(
 
     wind_radius_km : float, default=300
         Radius used to calculate local maximum wind speed.
+
+    maximum_translation_speed_mps : float or None, default=None
+        Optional maximum translation speed allowed between
+        consecutive tracked centers. If exceeded, tracking
+        terminates before the candidate center is accepted.
+        None disables translation-speed termination.
 
     Returns
     -------
@@ -602,4 +609,7 @@ def track_from_genesis(
         u_wind=u_wind,
         v_wind=v_wind,
         wind_radius_km=wind_radius_km,
+        maximum_translation_speed_mps=(
+            maximum_translation_speed_mps
+        ),
     )
