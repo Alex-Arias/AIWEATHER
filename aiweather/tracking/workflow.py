@@ -189,6 +189,9 @@ def build_native_tc_track(
         maximum_displacement_km=(
             maximum_displacement_km
         ),
+        maximum_gap_hours=(
+            candidate_interval_hours
+        ),
     )
 
     genesis_results = detect_genesis(

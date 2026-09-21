@@ -65,6 +65,7 @@ def associate_candidates(
     ],
     *,
     maximum_displacement_km: float = 500.0,
+    maximum_gap_hours: int | None = None,
 ) -> list[CandidateTrack]:
     """
     Associate pressure-minimum candidates through forecast time.
@@ -89,6 +90,11 @@ def associate_candidates(
         Maximum distance allowed between consecutive associated
         candidate centers.
 
+    maximum_gap_hours
+        Maximum forecast-time gap allowed between an existing
+        trajectory endpoint and a new candidate. ``None`` preserves
+        unrestricted temporal association.
+
     Returns
     -------
     list[CandidateTrack]
@@ -103,6 +109,14 @@ def associate_candidates(
     if maximum_displacement_km <= 0.0:
         raise ValueError(
             "maximum_displacement_km must be greater than zero."
+        )
+
+    if (
+        maximum_gap_hours is not None
+        and maximum_gap_hours <= 0
+    ):
+        raise ValueError(
+            "maximum_gap_hours must be greater than zero."
         )
 
     if not candidates_by_lead:
@@ -146,6 +160,16 @@ def associate_candidates(
 
         for track_index, track in enumerate(tracks):
             previous = track[-1]
+
+            if (
+                maximum_gap_hours is not None
+                and (
+                    int(lead_time_hours)
+                    - previous.lead_time_hours
+                )
+                > maximum_gap_hours
+            ):
+                continue
 
             for candidate_index, candidate in enumerate(
                 current_points

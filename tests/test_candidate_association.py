@@ -304,3 +304,76 @@ def test_duplicate_lead_times():
         associate_candidates(
             candidates
         )
+
+
+def test_stale_track_cannot_capture_current_candidate():
+    candidates = [
+        (
+            72,
+            [
+                minimum(
+                    100679.0,
+                    15.75,
+                    253.50,
+                )
+            ],
+        ),
+        (
+            108,
+            [
+                minimum(
+                    99006.0,
+                    15.75,
+                    255.00,
+                )
+            ],
+        ),
+        (
+            114,
+            [
+                minimum(
+                    99158.0,
+                    15.75,
+                    254.00,
+                )
+            ],
+        ),
+    ]
+
+    tracks = associate_candidates(
+        candidates,
+        maximum_displacement_km=500.0,
+        maximum_gap_hours=6,
+    )
+
+    continued = [
+        track
+        for track in tracks
+        if (
+            track.first.lead_time_hours == 108
+            and track.last.lead_time_hours == 114
+        )
+    ]
+
+    assert len(continued) == 1
+    assert len(continued[0]) == 2
+
+    stale = [
+        track
+        for track in tracks
+        if track.first.lead_time_hours == 72
+    ]
+
+    assert len(stale) == 1
+    assert len(stale[0]) == 1
+
+
+def test_invalid_maximum_gap_hours():
+    with pytest.raises(
+        ValueError,
+        match="maximum_gap_hours",
+    ):
+        associate_candidates(
+            [],
+            maximum_gap_hours=0,
+        )
