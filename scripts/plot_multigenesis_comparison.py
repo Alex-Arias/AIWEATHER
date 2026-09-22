@@ -4,6 +4,9 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+
 from aiweather.forecast import open_forecast
 from aiweather.tracking import build_native_tc_tracks
 
@@ -101,11 +104,13 @@ def main():
                 (model, genesis, records)
             )
 
+    projection = ccrs.PlateCarree()
+
     fig, axes = plt.subplots(
         1,
         2,
         figsize=(14, 6),
-        constrained_layout=True,
+        subplot_kw={"projection": projection},
     )
 
     domains = {
@@ -133,6 +138,7 @@ def main():
                 marker=".",
                 linewidth=1.7,
                 label=model,
+                transform=ccrs.PlateCarree(),
             )
 
             # Native-detection marker.
@@ -143,6 +149,7 @@ def main():
                 s=150,
                 color=line.get_color(),
                 zorder=5,
+                transform=ccrs.PlateCarree(),
             )
 
             # Mark every 24 forecast hours.
@@ -154,16 +161,50 @@ def main():
                         s=25,
                         color=line.get_color(),
                         zorder=4,
+                        transform=ccrs.PlateCarree(),
                     )
 
         xmin, xmax, ymin, ymax = domains[group]
 
-        ax.set_xlim(xmin, xmax)
-        ax.set_ylim(ymin, ymax)
-        ax.grid(True, alpha=0.3)
+        ax.set_extent(
+            [xmin, xmax, ymin, ymax],
+            crs=ccrs.PlateCarree(),
+        )
 
-        ax.set_xlabel("Longitude (°)")
-        ax.set_ylabel("Latitude (°)")
+        ax.add_feature(
+            cfeature.LAND,
+            facecolor="0.92",
+            zorder=0,
+        )
+
+        ax.add_feature(
+            cfeature.OCEAN,
+            facecolor="white",
+            zorder=0,
+        )
+
+        ax.coastlines(
+            resolution="50m",
+            linewidth=0.8,
+            zorder=2,
+        )
+
+        ax.add_feature(
+            cfeature.BORDERS,
+            linewidth=0.5,
+            zorder=2,
+        )
+
+        gridlines = ax.gridlines(
+            crs=ccrs.PlateCarree(),
+            draw_labels=True,
+            linewidth=0.5,
+            alpha=0.35,
+            linestyle="--",
+        )
+
+        gridlines.top_labels = False
+        gridlines.right_labels = False
 
         if group == western_name:
             title = f"{western_name} — western system"
@@ -184,6 +225,15 @@ def main():
         f"Initialization: "
         f"{init_dt:%Y-%m-%d %H} UTC",
         fontsize=14,
+        y=0.97,
+    )
+
+    fig.subplots_adjust(
+        left=0.06,
+        right=0.98,
+        bottom=0.10,
+        top=0.82,
+        wspace=0.18,
     )
 
     storm_slug = (
@@ -204,7 +254,6 @@ def main():
     fig.savefig(
         output,
         dpi=180,
-        bbox_inches="tight",
     )
 
     plt.close(fig)
