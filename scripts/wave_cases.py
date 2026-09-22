@@ -167,6 +167,116 @@ CASES = {
         "mwp_max": 18.0,
         "wind_max": 50.0,
     },
+
+    "odalys_20260920": {
+        "storm_name": "Odalys",
+        "init": "20260920T120000",
+        "case_id": "odalys_20260920T120000",
+        "center_source": "operational",
+        "center_path": (
+            "results/operational/"
+            "odalys_20260920T120000/"
+            "aifs2/aifs2_track.csv"
+        ),
+        "forecast_path": (
+            "outputs/aifs2/"
+            "20260920T120000/"
+            "forecast_azure.zarr"
+        ),
+        "wave_lead_times": [
+            72, 96, 120, 144, 168,
+        ],
+        "lat_min": 5.0,
+        "lat_max": 35.0,
+        "lon_min": -140.0,
+        "lon_max": -90.0,
+        "swh_max": 12.0,
+        "mwp_max": 18.0,
+        "wind_max": 40.0,
+    },
+
+    "polo_20260920": {
+        "storm_name": "Polo",
+        "init": "20260920T120000",
+        "case_id": "polo_20260920T120000",
+        "center_source": "operational",
+        "center_path": (
+            "results/operational/"
+            "polo_20260920T120000/"
+            "aifs2/aifs2_track.csv"
+        ),
+        "forecast_path": (
+            "outputs/aifs2/"
+            "20260920T120000/"
+            "forecast_azure.zarr"
+        ),
+        "wave_lead_times": [
+            72, 96, 120, 144, 168, 192, 216,
+        ],
+        "lat_min": 5.0,
+        "lat_max": 35.0,
+        "lon_min": -140.0,
+        "lon_max": -90.0,
+        "swh_max": 12.0,
+        "mwp_max": 18.0,
+        "wind_max": 40.0,
+    },
+
+    "odalys_20260921": {
+        "storm_name": "Odalys",
+        "init": "20260921T120000",
+        "case_id": "odalys_20260921T120000",
+        "center_source": "operational",
+        "center_path": (
+            "results/operational/"
+            "odalys_20260921T120000/"
+            "aifs2/aifs2_track.csv"
+        ),
+        "forecast_path": (
+            "outputs/aifs2/"
+            "20260921T120000/"
+            "forecast_azure.zarr"
+        ),
+        "wave_lead_times": [
+            48, 72, 96, 120, 144, 168,
+        ],
+        "lat_min": 5.0,
+        "lat_max": 35.0,
+        "lon_min": -140.0,
+        "lon_max": -90.0,
+        "swh_max": 12.0,
+        "mwp_max": 18.0,
+        "wind_max": 40.0,
+    },
+
+    "polo_20260921": {
+        "storm_name": "Polo",
+        "init": "20260921T120000",
+        "case_id": "polo_20260921T120000",
+        "center_source": "operational",
+        "center_path": (
+            "results/operational/"
+            "polo_20260921T120000/"
+            "aifs2/aifs2_track.csv"
+        ),
+        "forecast_path": (
+            "outputs/aifs2/"
+            "20260921T120000/"
+            "forecast_azure.zarr"
+        ),
+        "wave_lead_times": [
+            24, 48, 72, 96, 120, 144,
+            168, 192, 216, 240,
+        ],
+        "lat_min": 5.0,
+        "lat_max": 35.0,
+        "lon_min": -140.0,
+        "lon_max": -90.0,
+        "swh_max": 12.0,
+        "mwp_max": 18.0,
+        "wind_max": 40.0,
+    },
+
 }
 
 
