@@ -8,6 +8,44 @@ for every storm.
 
 
 CASES = {
+    "norbert_20260910": {
+        "storm_name": "Norbert",
+        "init": "20260910T120000",
+        "case_id": "norbert_20260910T120000",
+        "center_source": "operational",
+        "center_path": (
+            "results/operational/"
+            "norbert_20260910T120000/"
+            "aifs2/aifs2_track.csv"
+        ),
+        "forecast_path": (
+            "outputs/aifs2/"
+            "20260910T120000/"
+            "forecast_azure.zarr"
+        ),
+        "wave_lead_times": [
+            0,
+            24,
+            48,
+            72,
+            96,
+            120,
+            144,
+            168,
+            192,
+            216,
+            240,
+        ],
+        "lat_min": 0.0,
+        "lat_max": 40.0,
+        "lon_min": -170.0,
+        "lon_max": -95.0,
+        "longitude_reference": -140.0,
+        "swh_max": 12.0,
+        "mwp_max": 18.0,
+        "wind_max": 50.0,
+    },
+
     "elida": {
         "storm_name": "Elida",
         "init": "20260714T120000",
