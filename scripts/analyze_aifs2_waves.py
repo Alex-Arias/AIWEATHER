@@ -45,16 +45,158 @@ parser.add_argument(
     "--storm",
     required=True,
     help=(
-        "Storm key defined in scripts/wave_cases.py "
-        "(for example: elida, fausto, genevieve, hernan)."
+        "Configured storm key, or operational storm name "
+        "when used together with --init."
+    ),
+)
+
+parser.add_argument(
+    "--init",
+    default=None,
+    help=(
+        "Operational AIFS2 initialization in YYYYMMDDTHHMMSS "
+        "format. When supplied, construct the wave case "
+        "automatically instead of reading a configured case."
+    ),
+)
+
+
+parser.add_argument(
+    "--dry-run",
+    action="store_true",
+    help=(
+        "Validate the wave case, forecast, storm track, "
+        "and usable lead times without generating products."
     ),
 )
 
 args = parser.parse_args()
 
-CASE = get_case(
-    args.storm
-)
+
+def build_operational_case(
+    storm,
+    init,
+):
+    """Construct one operational AIFS2 wave-analysis case."""
+
+    storm_key = storm.lower()
+
+    # Operational initialization must use the canonical
+    # AIWeather timestamp format: YYYYMMDDTHHMMSS.
+    try:
+        initialization_time = pd.to_datetime(
+            init,
+            format="%Y%m%dT%H%M%S",
+            errors="raise",
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "Invalid --init value "
+            f"{init!r}. Expected YYYYMMDDTHHMMSS, "
+            "for example 20260923T120000."
+        ) from exc
+
+    canonical_init = initialization_time.strftime(
+        "%Y%m%dT%H%M%S"
+    )
+
+    if init != canonical_init:
+        raise ValueError(
+            "Invalid --init value "
+            f"{init!r}. Expected canonical format "
+            "YYYYMMDDTHHMMSS."
+        )
+
+    operational_dir = (
+        Path("results/operational")
+        / f"{storm_key}_{init}"
+        / "aifs2"
+    )
+
+    center_path = (
+        operational_dir
+        / "aifs2_track.csv"
+    )
+
+    if not center_path.is_file():
+        raise FileNotFoundError(
+            "Operational AIFS2 track not found: "
+            f"{center_path}"
+        )
+
+    forecast_dir = (
+        Path("outputs/aifs2")
+        / init
+    )
+
+    forecast_candidates = [
+        forecast_dir / "forecast.zarr",
+        forecast_dir / "forecast_azure.zarr",
+    ]
+
+    existing_forecasts = [
+        candidate
+        for candidate in forecast_candidates
+        if candidate.exists()
+    ]
+
+    if not existing_forecasts:
+        raise FileNotFoundError(
+            "No AIFS2 forecast store found in "
+            f"{forecast_dir}. Expected forecast.zarr "
+            "or forecast_azure.zarr."
+        )
+
+    if len(existing_forecasts) > 1:
+        raise RuntimeError(
+            "Multiple AIFS2 forecast stores found: "
+            + ", ".join(
+                str(path)
+                for path in existing_forecasts
+            )
+        )
+
+    return {
+        "storm_name": storm_key.title(),
+        "init": init,
+        "case_id": f"{storm_key}_{init}",
+        "center_source": "operational",
+        "center_path": str(center_path),
+        "forecast_path": str(
+            existing_forecasts[0]
+        ),
+        "wave_lead_times": [
+            0,
+            24,
+            48,
+            72,
+            96,
+            120,
+            144,
+            168,
+            192,
+            216,
+            240,
+        ],
+        "lat_min": 5.0,
+        "lat_max": 35.0,
+        "lon_min": -140.0,
+        "lon_max": -90.0,
+        "swh_max": 12.0,
+        "mwp_max": 18.0,
+        "wind_max": 50.0,
+    }
+
+
+if args.init is None:
+    CASE = get_case(
+        args.storm
+    )
+else:
+    CASE = build_operational_case(
+        args.storm,
+        args.init,
+    )
 
 CENTER_SOURCE = CASE.get(
     "center_source",
@@ -73,7 +215,13 @@ CENTER_SOURCE_LABEL = CENTER_SOURCE_LABELS.get(
     CENTER_SOURCE,
 )
 
-STORM_KEY = args.storm.lower()
+if args.init is None:
+    STORM_KEY = args.storm.lower()
+else:
+    STORM_KEY = (
+        f"{args.storm.lower()}_"
+        f"{args.init[:8]}"
+    )
 
 STORM_NAME = CASE[
     "storm_name"
@@ -421,6 +569,91 @@ lon_grid, lat_grid = np.meshgrid(
 track = load_wave_centers(
     CASE
 )
+
+
+# ============================================================
+# Operational lead-time discovery
+# ============================================================
+
+if args.init is not None:
+    track_leads = set(
+        pd.to_numeric(
+            track["lead_time_hours"],
+            errors="coerce",
+        )
+        .dropna()
+        .astype(int)
+        .tolist()
+    )
+
+    forecast_lead_set = set(
+        int(value)
+        for value in forecast_leads
+    )
+
+    # Wave products are generated every 24 h.  Restrict them
+    # to leads present in both the forecast and operational
+    # storm track.
+    LEAD_TIMES = [
+        lead
+        for lead in sorted(
+            forecast_lead_set & track_leads
+        )
+        if lead % 24 == 0
+    ]
+
+    if not LEAD_TIMES:
+        raise RuntimeError(
+            "No common 24-hour wave-analysis leads found "
+            "between the AIFS2 forecast and operational track."
+        )
+
+    print()
+    print("OPERATIONAL WAVE LEAD DISCOVERY")
+    print("=" * 60)
+    print(
+        "Forecast leads : "
+        f"{min(forecast_lead_set)}–"
+        f"{max(forecast_lead_set)} h "
+        f"({len(forecast_lead_set)} available)"
+    )
+    print(
+        "Track leads    : "
+        f"{min(track_leads)}–"
+        f"{max(track_leads)} h "
+        f"({len(track_leads)} available)"
+    )
+    print(
+        "Wave leads     : "
+        + ", ".join(
+            f"{lead}h"
+            for lead in LEAD_TIMES
+        )
+    )
+
+
+if args.dry_run:
+    print()
+    print("DRY RUN")
+    print("=" * 60)
+    print(f"Storm          : {STORM_NAME}")
+    print(f"Initialization : {CASE['init']}")
+    print(f"Center source  : {CENTER_SOURCE}")
+    print(f"Center path    : {CASE['center_path']}")
+    print(f"Forecast path  : {FORECAST_PATH}")
+    print(
+        "Wave leads     : "
+        + ", ".join(
+            f"{lead}h"
+            for lead in LEAD_TIMES
+        )
+    )
+    print()
+    print(
+        "PASS — operational wave case is ready "
+        "for analysis."
+    )
+    raise SystemExit(0)
 
 
 # ============================================================
