@@ -31,6 +31,13 @@ CASES = {
                 "aifs2_odalys_wave_diagnostics.csv"
             ),
         },
+        "2026-09-22 12 UTC": {
+            "init": "2026-09-22 12:00:00",
+            "path": Path(
+                "results/waves/aifs2_odalys_20260922/"
+                "aifs2_odalys_wave_diagnostics.csv"
+            ),
+        },
     },
     "Polo": {
         "2026-09-20 12 UTC": {
@@ -44,6 +51,13 @@ CASES = {
             "init": "2026-09-21 12:00:00",
             "path": Path(
                 "results/waves/aifs2_polo_20260921/"
+                "aifs2_polo_wave_diagnostics.csv"
+            ),
+        },
+        "2026-09-22 12 UTC": {
+            "init": "2026-09-22 12:00:00",
+            "path": Path(
+                "results/waves/aifs2_polo_20260922/"
                 "aifs2_polo_wave_diagnostics.csv"
             ),
         },
@@ -92,6 +106,7 @@ fig, axes = plt.subplots(
 cycle_styles = {
     "2026-09-20 12 UTC": "-",
     "2026-09-21 12 UTC": "--",
+    "2026-09-22 12 UTC": ":",
 }
 
 
@@ -124,71 +139,101 @@ for column, storm in enumerate(("Odalys", "Polo")):
             label=label,
         )
 
-    # Compare the two cycles at identical valid times.
-    old = data[storm]["2026-09-20 12 UTC"]
-    new = data[storm]["2026-09-21 12 UTC"]
+    # Compare successive operational cycles at identical
+    # forecast valid times. This shows how the storm-relative
+    # SWH forecast changes as initialization advances.
+    revision_pairs = [
+        (
+            "2026-09-20 12 UTC",
+            "2026-09-21 12 UTC",
+            "21 Sep - 20 Sep",
+            "-",
+        ),
+        (
+            "2026-09-21 12 UTC",
+            "2026-09-22 12 UTC",
+            "22 Sep - 21 Sep",
+            "--",
+        ),
+    ]
 
-    common = old[
-        [
-            "valid_time",
-            "max_swh_300km_m",
-        ]
-    ].merge(
-        new[
+    for (
+        old_label,
+        new_label,
+        revision_label,
+        revision_style,
+    ) in revision_pairs:
+
+        old = data[storm][old_label]
+        new = data[storm][new_label]
+
+        common = old[
             [
                 "valid_time",
                 "max_swh_300km_m",
             ]
-        ],
-        on="valid_time",
-        suffixes=("_20", "_21"),
-    )
+        ].merge(
+            new[
+                [
+                    "valid_time",
+                    "max_swh_300km_m",
+                ]
+            ],
+            on="valid_time",
+            suffixes=("_old", "_new"),
+        )
 
-    common["delta_swh_m"] = (
-        common["max_swh_300km_m_21"]
-        - common["max_swh_300km_m_20"]
-    )
+        common["delta_swh_m"] = (
+            common["max_swh_300km_m_new"]
+            - common["max_swh_300km_m_old"]
+        )
 
-    ax_delta.plot(
-        common["valid_time"],
-        common["delta_swh_m"],
-        linewidth=2.0,
-        marker="o",
-        markersize=3,
-    )
+        revision_line, = ax_delta.plot(
+            common["valid_time"],
+            common["delta_swh_m"],
+            linewidth=2.0,
+            linestyle=revision_style,
+            marker="o",
+            markersize=3,
+            label=revision_label,
+        )
+
+        # Mark the largest absolute SWH revision for each
+        # consecutive cycle pair.
+        if not common.empty:
+            peak_index = (
+                common["delta_swh_m"]
+                .abs()
+                .idxmax()
+            )
+            peak = common.loc[peak_index]
+
+            ax_delta.scatter(
+                peak["valid_time"],
+                peak["delta_swh_m"],
+                s=55,
+                color=revision_line.get_color(),
+                zorder=5,
+            )
+
+            ax_delta.annotate(
+                f"{peak['delta_swh_m']:+.2f} m",
+                xy=(
+                    peak["valid_time"],
+                    peak["delta_swh_m"],
+                ),
+                xytext=(8, 8),
+                textcoords="offset points",
+                fontsize=9,
+                color=revision_line.get_color(),
+            )
 
     ax_delta.axhline(
         0.0,
         linewidth=1.0,
-        linestyle="--",
+        linestyle=":",
+        color="black",
     )
-
-    # Mark the largest absolute cycle-to-cycle SWH revision.
-    if not common.empty:
-        peak_index = (
-            common["delta_swh_m"]
-            .abs()
-            .idxmax()
-        )
-        peak = common.loc[peak_index]
-
-        ax_delta.scatter(
-            peak["valid_time"],
-            peak["delta_swh_m"],
-            s=55,
-            zorder=5,
-        )
-
-        ax_delta.annotate(
-            f"{peak['delta_swh_m']:+.2f} m",
-            xy=(
-                peak["valid_time"],
-                peak["delta_swh_m"],
-            ),
-            xytext=(8, 8),
-            textcoords="offset points",
-            fontsize=9,
-        )
 
     ax_swh.set_title(storm)
 
@@ -201,7 +246,7 @@ for column, storm in enumerate(("Odalys", "Polo")):
     )
 
     ax_delta.set_ylabel(
-        "$\\Delta$SWH (21 Sep - 20 Sep) (m)"
+        "$\\Delta$SWH between successive cycles (m)"
     )
 
     ax_delta.set_xlabel(
@@ -219,17 +264,22 @@ for column, storm in enumerate(("Odalys", "Polo")):
         )
 
         ax.xaxis.set_major_formatter(
-            mdates.DateFormatter("%d Sep")
+            mdates.DateFormatter("%d %b")
         )
 
     ax_swh.legend(
         title="Initialization",
     )
 
+    ax_delta.legend(
+        title="Cycle revision",
+        fontsize=9,
+    )
+
 
 fig.suptitle(
     "AIFS2 Operational Wave Forecast Cycle Comparison\n"
-    "Odalys and Polo — 20 vs 21 September 2026",
+    "Odalys and Polo — 20–22 September 2026",
     fontsize=14,
 )
 
@@ -237,7 +287,7 @@ fig.suptitle(
 output = Path(
     "outputs/verification/"
     "polo_odalys_wave_cycles_"
-    "20260920_20260921.png"
+    "20260920_20260922.png"
 )
 
 output.parent.mkdir(
@@ -262,54 +312,83 @@ print()
 print("COMMON VALID-TIME COMPARISON")
 print("=" * 72)
 
+revision_pairs = [
+    (
+        "2026-09-20 12 UTC",
+        "2026-09-21 12 UTC",
+        "21 Sep - 20 Sep",
+    ),
+    (
+        "2026-09-21 12 UTC",
+        "2026-09-22 12 UTC",
+        "22 Sep - 21 Sep",
+    ),
+]
+
 for storm in ("Odalys", "Polo"):
 
-    old = data[storm]["2026-09-20 12 UTC"]
-    new = data[storm]["2026-09-21 12 UTC"]
+    print()
+    print(storm.upper())
+    print("-" * 72)
 
-    merged = old[
-        [
-            "valid_time",
-            "max_swh_300km_m",
-            "max_wind_300km_ms",
-        ]
-    ].merge(
-        new[
+    for old_label, new_label, label in revision_pairs:
+
+        old = data[storm][old_label]
+        new = data[storm][new_label]
+
+        merged = old[
             [
                 "valid_time",
                 "max_swh_300km_m",
                 "max_wind_300km_ms",
             ]
-        ],
-        on="valid_time",
-        suffixes=("_20", "_21"),
-    )
-
-    merged["delta_swh_m"] = (
-        merged["max_swh_300km_m_21"]
-        - merged["max_swh_300km_m_20"]
-    )
-
-    merged["delta_wind_ms"] = (
-        merged["max_wind_300km_ms_21"]
-        - merged["max_wind_300km_ms_20"]
-    )
-
-    print(f"\n{storm}")
-    print(
-        f"common times : {len(merged)}"
-    )
-
-    if len(merged):
-        print(
-            "mean ΔSWH   : "
-            f"{merged['delta_swh_m'].mean():+.2f} m"
+        ].merge(
+            new[
+                [
+                    "valid_time",
+                    "max_swh_300km_m",
+                    "max_wind_300km_ms",
+                ]
+            ],
+            on="valid_time",
+            suffixes=("_old", "_new"),
         )
-        print(
-            "max |ΔSWH| : "
-            f"{merged['delta_swh_m'].abs().max():.2f} m"
+
+        merged["delta_swh_m"] = (
+            merged["max_swh_300km_m_new"]
+            - merged["max_swh_300km_m_old"]
         )
+
+        merged["delta_wind_ms"] = (
+            merged["max_wind_300km_ms_new"]
+            - merged["max_wind_300km_ms_old"]
+        )
+
+        print()
+        print(label)
         print(
-            "mean Δwind  : "
-            f"{merged['delta_wind_ms'].mean():+.2f} m/s"
+            f"common times : {len(merged)}"
+        )
+
+        if merged.empty:
+            continue
+
+        print(
+            "mean dSWH   : "
+            f"{merged['delta_swh_m'].mean():+.3f} m"
+        )
+
+        print(
+            "max |dSWH| : "
+            f"{merged['delta_swh_m'].abs().max():.3f} m"
+        )
+
+        print(
+            "mean dWind  : "
+            f"{merged['delta_wind_ms'].mean():+.3f} m/s"
+        )
+
+        print(
+            "max |dWind|: "
+            f"{merged['delta_wind_ms'].abs().max():.3f} m/s"
         )
