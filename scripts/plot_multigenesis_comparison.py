@@ -56,13 +56,28 @@ def main():
     western_name = args.western_name
     eastern_name = args.eastern_name
 
+    aifs2_default = Path(
+        f"outputs/aifs2/{init}/forecast.zarr"
+    )
+    aifs2_legacy = Path(
+        f"outputs/aifs2/{init}/forecast_azure.zarr"
+    )
+
+    if aifs2_default.exists():
+        aifs2_path = aifs2_default
+    elif aifs2_legacy.exists():
+        aifs2_path = aifs2_legacy
+    else:
+        raise FileNotFoundError(
+            "AIFS2 forecast not found. Checked: "
+            f"{aifs2_default} and {aifs2_legacy}"
+        )
+
     forecasts = {
         "GraphCast": Path(
             f"outputs/graphcast/{init}/forecast.zarr"
         ),
-        "AIFS2": Path(
-            f"outputs/aifs2/{init}/forecast_azure.zarr"
-        ),
+        "AIFS2": aifs2_path,
         "Pangu3": Path(
             f"outputs/pangu3/{init}/forecast.zarr"
         ),
