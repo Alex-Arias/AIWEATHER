@@ -15,54 +15,152 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-CASES = {
-    "Odalys": {
-        "2026-09-20 12 UTC": {
-            "init": "2026-09-20 12:00:00",
-            "path": Path(
-                "results/waves/aifs2_odalys_20260920/"
-                "aifs2_odalys_wave_diagnostics.csv"
-            ),
-        },
-        "2026-09-21 12 UTC": {
-            "init": "2026-09-21 12:00:00",
-            "path": Path(
-                "results/waves/aifs2_odalys_20260921/"
-                "aifs2_odalys_wave_diagnostics.csv"
-            ),
-        },
-        "2026-09-22 12 UTC": {
-            "init": "2026-09-22 12:00:00",
-            "path": Path(
-                "results/waves/aifs2_odalys_20260922/"
-                "aifs2_odalys_wave_diagnostics.csv"
-            ),
-        },
-    },
-    "Polo": {
-        "2026-09-20 12 UTC": {
-            "init": "2026-09-20 12:00:00",
-            "path": Path(
-                "results/waves/aifs2_polo_20260920/"
-                "aifs2_polo_wave_diagnostics.csv"
-            ),
-        },
-        "2026-09-21 12 UTC": {
-            "init": "2026-09-21 12:00:00",
-            "path": Path(
-                "results/waves/aifs2_polo_20260921/"
-                "aifs2_polo_wave_diagnostics.csv"
-            ),
-        },
-        "2026-09-22 12 UTC": {
-            "init": "2026-09-22 12:00:00",
-            "path": Path(
-                "results/waves/aifs2_polo_20260922/"
-                "aifs2_polo_wave_diagnostics.csv"
-            ),
-        },
-    },
-}
+STORMS = ("Odalys", "Polo")
+WAVE_ROOT = Path("results/waves")
+INIT_HOUR_UTC = 12
+
+
+def discover_cases():
+    """
+    Discover completed operational AIFS2 wave cycles.
+
+    Only directories following
+
+        aifs2_<storm>_YYYYMMDD
+
+    are considered. Historical undated wave cases are ignored.
+
+    A cycle is retained only when diagnostics exist for every
+    storm in STORMS.
+    """
+    discovered = {
+        storm: {}
+        for storm in STORMS
+    }
+
+    for storm in STORMS:
+        storm_lower = storm.lower()
+
+        pattern = (
+            f"aifs2_{storm_lower}_"
+            "[0-9][0-9][0-9][0-9]"
+            "[0-9][0-9][0-9][0-9]"
+        )
+
+        for directory in sorted(
+            WAVE_ROOT.glob(pattern)
+        ):
+            date_string = directory.name.rsplit(
+                "_",
+                1,
+            )[-1]
+
+            try:
+                date = pd.to_datetime(
+                    date_string,
+                    format="%Y%m%d",
+                )
+            except ValueError:
+                continue
+
+            diagnostics = directory / (
+                f"aifs2_{storm_lower}_"
+                "wave_diagnostics.csv"
+            )
+
+            if not diagnostics.is_file():
+                continue
+
+            init = date + pd.Timedelta(
+                hours=INIT_HOUR_UTC
+            )
+
+            cycle_key = init.strftime(
+                "%Y%m%dT%H%M%S"
+            )
+
+            discovered[storm][cycle_key] = {
+                "init": init.strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
+                "path": diagnostics,
+            }
+
+    common_cycles = set.intersection(
+        *(
+            set(discovered[storm])
+            for storm in STORMS
+        )
+    )
+
+    common_cycles = sorted(common_cycles)
+
+    if len(common_cycles) < 2:
+        raise RuntimeError(
+            "At least two complete common operational "
+            "wave cycles are required."
+        )
+
+    cases = {
+        storm: {}
+        for storm in STORMS
+    }
+
+    for cycle in common_cycles:
+        timestamp = pd.to_datetime(
+            cycle,
+            format="%Y%m%dT%H%M%S",
+        )
+
+        label = timestamp.strftime(
+            "%Y-%m-%d %H UTC"
+        )
+
+        for storm in STORMS:
+            cases[storm][label] = (
+                discovered[storm][cycle]
+            )
+
+    return cases, common_cycles
+
+
+CASES, CYCLE_KEYS = discover_cases()
+
+# Labels are already chronological because CYCLE_KEYS is sorted
+# and discover_cases() inserts cases in that order.
+CYCLE_LABELS = list(
+    CASES[STORMS[0]]
+)
+
+# Build consecutive forecast-cycle comparisons automatically:
+# cycle 2 - cycle 1, cycle 3 - cycle 2, etc.
+revision_pairs = []
+
+for index in range(1, len(CYCLE_LABELS)):
+    old_label = CYCLE_LABELS[index - 1]
+    new_label = CYCLE_LABELS[index]
+
+    old_time = pd.to_datetime(
+        CYCLE_KEYS[index - 1],
+        format="%Y%m%dT%H%M%S",
+    )
+    new_time = pd.to_datetime(
+        CYCLE_KEYS[index],
+        format="%Y%m%dT%H%M%S",
+    )
+
+    revision_label = (
+        f"{new_time.strftime('%d %b')} - "
+        f"{old_time.strftime('%d %b')}"
+    )
+
+    revision_pairs.append(
+        (
+            old_label,
+            new_label,
+            revision_label,
+        )
+    )
 
 
 def load_case(config):
@@ -103,10 +201,20 @@ fig, axes = plt.subplots(
     constrained_layout=True,
 )
 
+line_styles = [
+    "-",
+    "--",
+    ":",
+    "-.",
+]
+
 cycle_styles = {
-    "2026-09-20 12 UTC": "-",
-    "2026-09-21 12 UTC": "--",
-    "2026-09-22 12 UTC": ":",
+    label: line_styles[
+        index % len(line_styles)
+    ]
+    for index, label in enumerate(
+        CASES[STORMS[0]]
+    )
 }
 
 
@@ -142,27 +250,15 @@ for column, storm in enumerate(("Odalys", "Polo")):
     # Compare successive operational cycles at identical
     # forecast valid times. This shows how the storm-relative
     # SWH forecast changes as initialization advances.
-    revision_pairs = [
-        (
-            "2026-09-20 12 UTC",
-            "2026-09-21 12 UTC",
-            "21 Sep - 20 Sep",
-            "-",
-        ),
-        (
-            "2026-09-21 12 UTC",
-            "2026-09-22 12 UTC",
-            "22 Sep - 21 Sep",
-            "--",
-        ),
-    ]
-
-    for (
+    for revision_index, (
         old_label,
         new_label,
         revision_label,
-        revision_style,
-    ) in revision_pairs:
+    ) in enumerate(revision_pairs):
+
+        revision_style = line_styles[
+            revision_index % len(line_styles)
+        ]
 
         old = data[storm][old_label]
         new = data[storm][new_label]
@@ -277,17 +373,42 @@ for column, storm in enumerate(("Odalys", "Polo")):
     )
 
 
+first_cycle = pd.to_datetime(
+    CYCLE_KEYS[0],
+    format="%Y%m%dT%H%M%S",
+)
+
+last_cycle = pd.to_datetime(
+    CYCLE_KEYS[-1],
+    format="%Y%m%dT%H%M%S",
+)
+
+if (
+    first_cycle.year == last_cycle.year
+    and first_cycle.month == last_cycle.month
+):
+    cycle_range_title = (
+        f"{first_cycle.strftime('%d')}–"
+        f"{last_cycle.strftime('%d %B %Y')}"
+    )
+else:
+    cycle_range_title = (
+        f"{first_cycle.strftime('%d %b %Y')} – "
+        f"{last_cycle.strftime('%d %b %Y')}"
+    )
+
 fig.suptitle(
     "AIFS2 Operational Wave Forecast Cycle Comparison\n"
-    "Odalys and Polo — 20–22 September 2026",
+    f"{' and '.join(STORMS)} — {cycle_range_title}",
     fontsize=14,
 )
 
 
 output = Path(
     "outputs/verification/"
-    "polo_odalys_wave_cycles_"
-    "20260920_20260922.png"
+    f"polo_odalys_wave_cycles_"
+    f"{first_cycle.strftime('%Y%m%d')}_"
+    f"{last_cycle.strftime('%Y%m%d')}.png"
 )
 
 output.parent.mkdir(
@@ -312,20 +433,7 @@ print()
 print("COMMON VALID-TIME COMPARISON")
 print("=" * 72)
 
-revision_pairs = [
-    (
-        "2026-09-20 12 UTC",
-        "2026-09-21 12 UTC",
-        "21 Sep - 20 Sep",
-    ),
-    (
-        "2026-09-21 12 UTC",
-        "2026-09-22 12 UTC",
-        "22 Sep - 21 Sep",
-    ),
-]
-
-for storm in ("Odalys", "Polo"):
+for storm in STORMS:
 
     print()
     print(storm.upper())
