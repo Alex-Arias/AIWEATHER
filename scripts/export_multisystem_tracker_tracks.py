@@ -161,8 +161,9 @@ def select_originating_regional_track(
     excluded_path_ids=None,
 ):
     """
-    Select the longest tracker path whose first point originates
-    inside the requested geographic region.
+    Select a tracker path whose first point originates inside the
+    requested geographic region, prioritizing the earliest forecast
+    origin and then the greatest temporal support.
 
     This prevents a long-lived track that originates in one region
     from being reassigned to another system merely because it later
@@ -220,14 +221,20 @@ def select_originating_regional_track(
     if not candidates:
         return None
 
-    # Prefer the candidate with the greatest temporal support.
-    # Break ties using the number of tracker points.
-    return max(
+    # Prefer candidates that originate earliest in the forecast.
+    # Among candidates with the same first lead time, prefer greater
+    # temporal support, then more tracker points. Use path_id as a
+    # deterministic final tie-breaker.
+    return min(
         candidates,
         key=lambda track: (
-            int(track.lead_time_hours[-1])
-            - int(track.lead_time_hours[0]),
-            len(track),
+            int(track.lead_time_hours[0]),
+            -(
+                int(track.lead_time_hours[-1])
+                - int(track.lead_time_hours[0])
+            ),
+            -len(track),
+            int(track.path_id),
         ),
     )
 
@@ -484,7 +491,7 @@ def main():
                     "storm_classification":
                         classification,
                     "selection_method":
-                        "largest_number_of_points_in_region",
+                        "earliest_origin_then_temporal_support_in_region",
                     "selection_region":
                         region,
                     "uses_ibtracs_for_selection":
