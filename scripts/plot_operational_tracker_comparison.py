@@ -349,9 +349,11 @@ def main():
 
             if row == 0:
                 ax.set_title(
-                    TRACKER_LABELS[tracker],
-                    fontsize=13,
+                    f"{TRACKER_LABELS[tracker]} tracker",
+                    fontsize=14,
                     fontweight="bold",
+                    y=1.02,
+                    pad=4,
                 )
 
             if col == 0:
