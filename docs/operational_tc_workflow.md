@@ -6,7 +6,13 @@ This document describes the AIWeather workflow for deterministic, operational-st
 
 The workflow is distinct from genesis detection and from formal forecast verification. It is intended to answer the operational question: given a known tropical cyclone and a forecast initialization, how do the supported AI forecast systems represent the subsequent cyclone track, intensity-related fields, and, when available, the storm-relative wave environment?
 
-The implementation described here corresponds to the workflow completed through AIWeather commit `78b23bb` (`Support Marie and Lowell operational wave analysis`). The full regression suite at that checkpoint completed with 466 passed tests and 88 warnings.
+The workflow has subsequently been extended beyond the original Marie/Lowell implementation to support repeated operational forecast cycles, Native/WuDuan/Vitart tracker comparison, multicycle track visualization, automated AIFS2 operational wave analysis, multicycle wave comparison, and verification of frozen operational tracks against an independent best-track reference.
+
+The current operational architecture therefore separates three complementary products:
+
+1. **forecast diagnostics**, which can be generated immediately from each forecast cycle;
+2. **multicycle evolution**, which measures how successive forecasts and tracker solutions change through time; and
+3. **formal verification**, which is performed against independent best-track information when sufficient reference observations are available.
 
 ## 2. Development history
 
@@ -38,7 +44,33 @@ The Karina experiment also established the operational interpretation of AIFS2 w
 
 Marie (EP132026) and Lowell (EP122026), initialized at 0000 UTC 3 September 2026, extended the workflow to simultaneous tropical cyclones and four deterministic forecast configurations: AIFS2, GraphCast, Pangu3, and Pangu6.
 
-The experiment also required continuous-longitude handling for Lowell and generalized the AIFS2 wave analysis to operational storm centers. The resulting implementation represents the current operational workflow documented here.
+The experiment also required continuous-longitude handling for Lowell and generalized the AIFS2 wave analysis to operational storm centers.
+
+### 2.5 Odalys/Polo multicycle operational experiment
+
+The Odalys and Polo experiment extended the workflow from isolated operational cases to a sequence of consecutive forecast cycles. Four forecast initializations were retained as separate operational experiments:
+
+- **Cycle 1:** 20 September 2026 at 1200 UTC
+- **Cycle 2:** 21 September 2026 at 1200 UTC
+- **Cycle 3:** 22 September 2026 at 1200 UTC
+- **Cycle 4:** 23 September 2026 at 1200 UTC
+
+The experiment uses the available deterministic forecasts from **GraphCast, AIFS2, Pangu3, and Pangu6** and compares three tropical-cyclone tracking methods: **Native, WuDuan, and Vitart**.
+
+Tracker availability is not identical for every combination of storm, model, cycle, and tracking method. Missing tracker products remain explicitly missing rather than being synthesized or substituted. This preserves the actual operational behavior of each forecast/tracker combination.
+
+Two complementary visualization levels are used:
+
+1. a **single-cycle tracker comparison**, which compares Native, WuDuan, and Vitart solutions for one forecast initialization; and
+2. a **multicycle tracker comparison**, which overlays successive forecast cycles while preserving both forecast-model and tracker identity.
+
+In the multicycle representation, forecast-model identity is encoded by color and forecast-cycle identity by line style, while Native, WuDuan, and Vitart solutions are separated by panel. This permits forecast evolution across successive initializations to be examined without treating inter-cycle differences as forecast error.
+
+The multicycle plotter is not restricted to the original four cycles. Additional operational initializations can be appended as they become available, allowing the experiment to continue while a storm remains active.
+
+For AIFS2, the operational wave workflow was also generalized to operate from the tracked cyclone center for each forecast cycle. The cycle-level wrapper discovers available storms, determines compatible forecast and track leads, runs the storm-relative wave diagnostics, and can update the multicycle wave comparison.
+
+These track and wave products can therefore be generated while a cyclone is still evolving. They are **forecast-evolution diagnostics**. Formal statements about forecast skill require comparison with an independent best-track reference over the corresponding verification period.
 
 ## 3. Workflow architecture
 
@@ -191,29 +223,146 @@ Inter-system spread measures deterministic forecast diversity, not
 forecast error or skill. Statements about accuracy or skill require an
 independent reference.
 
+### 6.3 Operational tracker comparison
+
+AIWeather provides two complementary plotting tools for inspecting
+operational tropical-cyclone tracks.
+
+#### Single-cycle comparison
+
+For one forecast initialization, the Native, WuDuan, and Vitart
+tracker solutions can be compared across storms and forecast models.
+
+```bash
+python scripts/plot_operational_tracker_comparison.py \
+    --init 20260923T120000 \
+    --storms Odalys Polo \
+    --output results/operational/cycle4_tracker_comparison.png
+```
+
+The figure uses rows for storms, columns for Native, WuDuan, and
+Vitart trackers, and colors for GraphCast, AIFS2, Pangu3, and Pangu6.
+Missing tracker products remain explicitly missing.
+
+The first four Odalys/Polo cycles are:
+
+- Cycle 1: `20260920T120000`
+- Cycle 2: `20260921T120000`
+- Cycle 3: `20260922T120000`
+- Cycle 4: `20260923T120000`
+
+#### Multicycle comparison
+
+Successive operational forecast cycles can be overlaid with:
+
+```bash
+python scripts/plot_multicycle_tracker_comparison.py \
+    --inits 20260920T120000 20260921T120000 \
+            20260922T120000 20260923T120000 \
+    --storms Odalys Polo \
+    --output results/operational/multicycle_tracker_comparison.png
+```
+
+Initializations should be supplied from earliest to latest.
+
+The multicycle figure preserves three independent dimensions of the
+experiment:
+
+- color = forecast model;
+- line style = forecast cycle; and
+- panel = tracking method.
+
+For the original experiment, Cycles 1 through 4 correspond to
+20–23 September 2026 at 1200 UTC. Additional operational cycles can
+be appended as they become available without changing the analysis
+structure.
+
+These figures are forecast-diagnostic products. Differences among
+models, trackers, or successive forecast cycles describe forecast
+evolution and tracker sensitivity; they are not forecast-error
+metrics. Formal forecast error and skill assessment require
+comparison against an independent verifying best track.
+
 ## 7. AIFS2 storm-relative wave analysis
 
-The operational AIFS2 wave workflow diagnoses the wave field relative to the moving tracked cyclone center.
+The operational AIFS2 wave workflow diagnoses the wave field relative
+to the moving tracked cyclone center. Wave diagnostics are forecast
+products and can therefore be generated while a tropical cyclone is
+still active; they do not require a completed best-track record.
 
-The main analysis is run with:
+### 7.0 Operational cycle wrapper
 
-```bash
-python scripts/analyze_aifs2_waves.py --storm STORM
-```
-
-Wave evolution is generated with:
-
-```bash
-python scripts/plot_aifs2_wave_evolution.py --storm STORM
-```
-
-Radius-time diagnostics are generated with:
+The preferred entry point for a complete operational forecast cycle is:
 
 ```bash
-python scripts/plot_aifs2_wave_hovmoller.py --storm STORM
+python scripts/run_operational_waves.py \
+    --init YYYYMMDDTHHMMSS
 ```
 
-Case definitions and center handling are implemented through the operational wave-case and wave-center utilities.
+The wrapper discovers the storms available for the requested
+initialization and runs the AIFS2 storm-relative wave workflow for
+each case.
+
+Before generating products, the same workflow can be checked with:
+
+```bash
+python scripts/run_operational_waves.py \
+    --init YYYYMMDDTHHMMSS \
+    --dry-run
+```
+
+Dry-run mode discovers the operational storms, identifies the AIFS2
+forecast and track files, determines the compatible forecast and
+track leads, and runs analyzer preflight without generating wave
+products.
+
+The operational wave leads are therefore determined from the data
+available for each storm rather than assumed to be identical among
+cases.
+
+After successful storm analyses, the wrapper updates the multicycle
+wave comparison. This final step can be disabled when required with:
+
+```bash
+python scripts/run_operational_waves.py \
+    --init YYYYMMDDTHHMMSS \
+    --skip-comparison
+```
+
+The underlying analysis components remain available individually.
+The principal scripts are:
+
+- `scripts/analyze_aifs2_waves.py` for storm-relative wave analysis;
+- `scripts/plot_aifs2_wave_evolution.py` for wave-evolution figures;
+- `scripts/plot_aifs2_wave_hovmoller.py` for radius-time diagnostics;
+- `scripts/plot_multicycle_wave_comparison.py` for comparison among
+  operational forecast cycles;
+- `scripts/wave_cases.py` for operational wave-case definitions; and
+- `scripts/wave_centers.py` for storm-center handling.
+
+The operational sequence is therefore:
+
+```text
+AIFS2 forecast + operational tracked cyclone center
+                         |
+                         v
+              operational preflight
+                         |
+                         v
+       compatible forecast/track leads
+                         |
+                         v
+          storm-relative wave analysis
+                         |
+              +----------+----------+
+              |                     |
+              v                     v
+       per-cycle diagnostics   wave evolution /
+                               radial structure
+              |
+              v
+       multicycle comparison
+```
 
 ### 7.1 Storm-relative versus regional extrema
 
