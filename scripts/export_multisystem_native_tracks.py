@@ -139,6 +139,79 @@ def records_dataframe(records):
     )
 
 
+
+def select_regional_native_track(
+    results,
+    *,
+    classification,
+):
+    """
+    Select one native tropical-cyclone detection for an operational
+    geographic classification.
+
+    Candidates are classified from their genesis longitude. Selection
+    follows the native genesis convention by preferring the earliest
+    genesis lead and then the lowest genesis pressure. Additional
+    deterministic tie-breakers favor stronger qualifying persistence,
+    greater track support, and finally the lower native track index.
+
+    This selection is forecast-only and does not use observations,
+    IBTrACS, WuDuan, Vitart, or another forecast model.
+    """
+    if classification not in {
+        "western",
+        "eastern",
+    }:
+        raise ValueError(
+            "classification must be 'western' or 'eastern'."
+        )
+
+    candidates = []
+
+    for genesis, records in results:
+        genesis_lon_180 = lon180(
+            genesis.longitude
+        )
+
+        is_western = (
+            genesis_lon_180
+            < CLASSIFICATION_LONGITUDE
+        )
+
+        if classification == "western":
+            inside = is_western
+        else:
+            inside = not is_western
+
+        if inside:
+            candidates.append(
+                (genesis, records)
+            )
+
+    if not candidates:
+        return None
+
+    return min(
+        candidates,
+        key=lambda item: (
+            int(
+                item[0].genesis_lead_time_hours
+            ),
+            float(
+                item[0].pressure
+            ),
+            -int(
+                item[0].qualifying_points
+            ),
+            -len(
+                item[1]
+            ),
+            int(
+                item[0].track_index
+            ),
+        ),
+    )
+
 def main():
     args = parse_args()
 
@@ -204,21 +277,31 @@ def main():
 
         print("Detected systems:", len(results))
 
-        for genesis, records in results:
+        for classification in (
+            "western",
+            "eastern",
+        ):
+            selected = select_regional_native_track(
+                results,
+                classification=classification,
+            )
+
+            if selected is None:
+                print(
+                    f"  {names[classification]:<8s} "
+                    "no qualifying native detection"
+                )
+                continue
+
+            genesis, records = selected
 
             genesis_lon_180 = lon180(
                 genesis.longitude
             )
 
-            if (
-                genesis_lon_180
-                < CLASSIFICATION_LONGITUDE
-            ):
-                storm_name = names["western"]
-                classification = "western"
-            else:
-                storm_name = names["eastern"]
-                classification = "eastern"
+            storm_name = names[
+                classification
+            ]
 
             storm_slug = storm_name.lower()
 
