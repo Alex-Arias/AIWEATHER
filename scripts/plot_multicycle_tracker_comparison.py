@@ -400,7 +400,7 @@ def main():
         loc="lower center",
         ncol=4,
         frameon=True,
-        bbox_to_anchor=(0.35, 0.025),
+        bbox_to_anchor=(0.5, 0.075),
     )
 
     # Keep first legend when adding second one.
@@ -433,7 +433,7 @@ def main():
         loc="lower center",
         ncol=len(cycle_handles),
         frameon=True,
-        bbox_to_anchor=(0.70, 0.025),
+        bbox_to_anchor=(0.5, 0.025),
     )
 
     first_time = init_times[0]
@@ -450,7 +450,7 @@ def main():
 
     fig.text(
         0.5,
-        0.006,
+        0.002,
         "Color = forecast model; line style = forecast cycle; "
         "markers every 24 h.",
         ha="center",
@@ -461,7 +461,7 @@ def main():
     fig.subplots_adjust(
         left=0.07,
         right=0.985,
-        bottom=0.13,
+        bottom=0.19,
         top=0.88,
         wspace=0.08,
         hspace=0.16,
