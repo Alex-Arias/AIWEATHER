@@ -182,9 +182,9 @@ def build_operational_case(
         "lat_max": 35.0,
         "lon_min": -140.0,
         "lon_max": -90.0,
-        "swh_max": 12.0,
-        "mwp_max": 18.0,
-        "wind_max": 50.0,
+        "swh_max": 10.0,
+        "mwp_max": 14.0,
+        "wind_max": 35.0,
     }
 
 
