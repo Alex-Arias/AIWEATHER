@@ -113,16 +113,36 @@ def build_operational_case(
         / "aifs2"
     )
 
-    center_path = (
-        operational_dir
-        / "aifs2_track.csv"
-    )
+    # Select the best available operational storm-center track.
+    #
+    # Priority:
+    #   1. Native AIWeather tracker
+    #   2. WuDuan tracker
+    #   3. Vitart tracker
+    #
+    # This allows wave analysis to continue when the native
+    # tracker no longer qualifies an existing TC while preserving
+    # the actual center source used by the analysis.
+    center_candidates = [
+        ("native", operational_dir / "aifs2_track.csv"),
+        ("wuduan", operational_dir / "aifs2_wuduan_track.csv"),
+        ("vitart", operational_dir / "aifs2_vitart_track.csv"),
+    ]
 
-    if not center_path.is_file():
+    available_centers = [
+        (source, path)
+        for source, path in center_candidates
+        if path.is_file()
+    ]
+
+    if not available_centers:
         raise FileNotFoundError(
-            "Operational AIFS2 track not found: "
-            f"{center_path}"
+            "No operational AIFS2 storm-center track found in "
+            f"{operational_dir}. Expected native, WuDuan, "
+            "or Vitart track."
         )
+
+    center_source, center_path = available_centers[0]
 
     forecast_dir = (
         Path("outputs/aifs2")
@@ -160,13 +180,12 @@ def build_operational_case(
         "storm_name": storm_key.title(),
         "init": init,
         "case_id": f"{storm_key}_{init}",
-        "center_source": "operational",
+        "center_source": center_source,
         "center_path": str(center_path),
         "forecast_path": str(
             existing_forecasts[0]
         ),
         "wave_lead_times": [
-            0,
             24,
             48,
             72,
@@ -591,16 +610,19 @@ if args.init is not None:
         for value in forecast_leads
     )
 
-    # Wave products are generated every 24 h.  Restrict them
-    # to leads present in both the forecast and operational
-    # storm track.
-    LEAD_TIMES = [
-        lead
-        for lead in sorted(
-            forecast_lead_set & track_leads
-        )
-        if lead % 24 == 0
-    ]
+    # Wave products use the configured operational 24-h
+    # cadence. Restrict those requested leads to times present
+    # in both the forecast and operational storm track.
+    configured_leads = set(
+        int(lead)
+        for lead in LEAD_TIMES
+    )
+
+    LEAD_TIMES = sorted(
+        configured_leads
+        & forecast_lead_set
+        & track_leads
+    )
 
     if not LEAD_TIMES:
         raise RuntimeError(

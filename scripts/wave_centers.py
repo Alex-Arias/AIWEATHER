@@ -101,7 +101,20 @@ def load_wave_centers(case):
             path
         )
 
-        required = {
+        # WuDuan centers can come from either:
+        #
+        # 1. The legacy verification batch_points.csv schema.
+        # 2. A normalized operational *_wuduan_track.csv export.
+        #
+        # Detect the schema from the columns rather than from the
+        # center-source label so both workflows remain supported.
+        operational_required = {
+            "lead_time_hours",
+            "latitude",
+            "longitude",
+        }
+
+        batch_required = {
             "case_id",
             "tracker",
             "coverage",
@@ -110,50 +123,71 @@ def load_wave_centers(case):
             "forecast_longitude",
         }
 
-        missing = required - set(
-            df.columns
-        )
+        if operational_required.issubset(df.columns):
 
-        if missing:
+            centers = (
+                df.loc[
+                    :,
+                    [
+                        "lead_time_hours",
+                        "latitude",
+                        "longitude",
+                    ],
+                ]
+                .rename(
+                    columns={
+                        "latitude":
+                            "center_latitude",
+                        "longitude":
+                            "center_longitude",
+                    }
+                )
+                .copy()
+            )
+
+        elif batch_required.issubset(df.columns):
+
+            centers = (
+                df[
+                    (
+                        df["case_id"]
+                        == case_id
+                    )
+                    & (
+                        df["tracker"]
+                        == "wuduan"
+                    )
+                    & (
+                        df["coverage"]
+                        == "full"
+                    )
+                ]
+                .loc[
+                    :,
+                    [
+                        "lead_time_hours",
+                        "forecast_latitude",
+                        "forecast_longitude",
+                    ],
+                ]
+                .rename(
+                    columns={
+                        "forecast_latitude":
+                            "center_latitude",
+                        "forecast_longitude":
+                            "center_longitude",
+                    }
+                )
+                .copy()
+            )
+
+        else:
             raise ValueError(
-                f"WuDuan center file {path} "
-                f"is missing columns: "
-                f"{sorted(missing)}"
+                f"WuDuan center file {path} does not match "
+                "either the operational track schema or the "
+                "legacy batch_points.csv schema. "
+                f"Columns: {sorted(df.columns)}"
             )
-
-        centers = (
-            df[
-                (
-                    df["case_id"]
-                    == case_id
-                )
-                & (
-                    df["tracker"]
-                    == "wuduan"
-                )
-                & (
-                    df["coverage"]
-                    == "full"
-                )
-            ]
-            .loc[
-                :,
-                [
-                    "lead_time_hours",
-                    "forecast_latitude",
-                    "forecast_longitude",
-                ],
-            ]
-            .rename(
-                columns={
-                    "forecast_latitude":
-                        "center_latitude",
-                    "forecast_longitude":
-                        "center_longitude",
-                }
-            )
-            .copy()
-        )
 
     elif source in {
         "native",
