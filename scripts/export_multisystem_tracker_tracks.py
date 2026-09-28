@@ -23,8 +23,10 @@ import pandas as pd
 from aiweather.forecast import open_forecast
 from aiweather.tracking import (
     earth2studio_track_to_records,
+    read_track_records_csv,
     run_vitart_tracker,
     run_wuduan_tracker,
+    select_matching_track,
 )
 
 
@@ -62,6 +64,36 @@ def parse_args():
         "--init",
         required=True,
         help="Initialization time as YYYYMMDDTHHMMSS.",
+    )
+
+    parser.add_argument(
+        "--reference-init",
+        default=None,
+        help=(
+            "Previous operational initialization used for storm "
+            "continuity association. If omitted, selection uses the "
+            "original geographic classification."
+        ),
+    )
+
+    parser.add_argument(
+        "--association-minimum-overlap",
+        type=int,
+        default=2,
+        help=(
+            "Minimum exact common valid times required for "
+            "storm continuity association."
+        ),
+    )
+
+    parser.add_argument(
+        "--association-maximum-mean-error-km",
+        type=float,
+        default=600.0,
+        help=(
+            "Maximum mean track separation allowed for "
+            "storm continuity association."
+        ),
     )
 
     parser.add_argument(
@@ -242,6 +274,16 @@ def select_originating_regional_track(
 def main():
     args = parse_args()
 
+    if args.association_minimum_overlap < 1:
+        raise ValueError(
+            "--association-minimum-overlap must be >= 1."
+        )
+
+    if args.association_maximum_mean_error_km <= 0.0:
+        raise ValueError(
+            "--association-maximum-mean-error-km must be > 0."
+        )
+
     init = args.init
 
     forecasts = get_forecasts(init)
@@ -353,14 +395,111 @@ def main():
                 ),
             ) in systems.items():
 
-                selected = select_originating_regional_track(
-                    tracks,
-                    lat_min=region["lat_min"],
-                    lat_max=region["lat_max"],
-                    lon_min=region["lon_min"],
-                    lon_max=region["lon_max"],
-                    excluded_path_ids=assigned_path_ids,
-                )
+                association = None
+                selected = None
+
+                if args.reference_init is not None:
+                    storm_slug = (
+                        storm_name.lower()
+                        .replace(" ", "_")
+                    )
+
+                    reference_path = (
+                        Path("results")
+                        / "operational"
+                        / (
+                            f"{storm_slug}_"
+                            f"{args.reference_init}"
+                        )
+                        / model
+                        / (
+                            f"{model}_{tracker_name}_"
+                            "track.csv"
+                        )
+                    )
+
+                    if reference_path.exists():
+                        reference_records = (
+                            read_track_records_csv(
+                                reference_path
+                            )
+                        )
+
+                        available_tracks = [
+                            track
+                            for track in tracks
+                            if (
+                                track.path_id
+                                not in assigned_path_ids
+                            )
+                        ]
+
+                        match = select_matching_track(
+                            reference_records,
+                            available_tracks,
+                            initialization_time=(
+                                initialization_time
+                            ),
+                            minimum_overlap=(
+                                args
+                                .association_minimum_overlap
+                            ),
+                            maximum_mean_error_km=(
+                                args
+                                .association_maximum_mean_error_km
+                            ),
+                            reference_name=(
+                                "previous_cycle"
+                            ),
+                            candidate_name=(
+                                "current_cycle"
+                            ),
+                        )
+
+                        if match is not None:
+                            selected = match.track
+
+                            association = {
+                                "method":
+                                    "previous_cycle_valid_time_continuity",
+                                "reference_init":
+                                    args.reference_init,
+                                "reference_path":
+                                    str(reference_path),
+                                "overlap_count":
+                                    match.overlap_count,
+                                "mean_track_error_km":
+                                    match.mean_track_error_km,
+                                "minimum_overlap":
+                                    args.association_minimum_overlap,
+                                "maximum_mean_error_km":
+                                    args.association_maximum_mean_error_km,
+                            }
+
+                if (
+                    selected is None
+                    and args.reference_init is None
+                ):
+                    selected = (
+                        select_originating_regional_track(
+                            tracks,
+                            lat_min=region["lat_min"],
+                            lat_max=region["lat_max"],
+                            lon_min=region["lon_min"],
+                            lon_max=region["lon_max"],
+                            excluded_path_ids=(
+                                assigned_path_ids
+                            ),
+                        )
+                    )
+
+                    if selected is not None:
+                        association = {
+                            "method":
+                                "regional_origin",
+                            "reference_init":
+                                None,
+                        }
 
                 if selected is not None:
                     assigned_path_ids.add(
@@ -490,10 +629,15 @@ def main():
                         storm_name,
                     "storm_classification":
                         classification,
-                    "selection_method":
-                        "earliest_origin_then_temporal_support_in_region",
+                    "selection_method": (
+                        association["method"]
+                        if association is not None
+                        else None
+                    ),
                     "selection_region":
                         region,
+                    "storm_association":
+                        association,
                     "uses_ibtracs_for_selection":
                         False,
                     "uses_observed_position_for_selection":

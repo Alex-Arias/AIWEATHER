@@ -182,3 +182,78 @@ def test_rejects_track_originating_outside_region():
     )
 
     assert select([outside]) is None
+
+
+def test_previous_cycle_continuity_prefers_polo_over_new_eastern_system():
+    """
+    Regression test for Cycle-8 storm-identity ambiguity.
+
+    Two current-cycle tracker paths can occupy the broad eastern
+    operational region:
+
+    * a newly detected eastern-Pacific system near 12N, 98W;
+    * the continuation of Polo near Baja California.
+
+    Geographic origin alone cannot establish storm identity.  When a
+    previous-cycle Polo track is available, valid-time continuity must
+    select the Baja continuation.
+    """
+    from aiweather.tracking import (
+        earth2studio_track_to_records,
+        select_matching_track,
+    )
+
+    # Previous-cycle Polo forecast.
+    #
+    # Cycle 7 initialized 24 h before Cycle 8, so leads 24--72 h
+    # overlap Cycle-8 leads 0--48 h in VALID TIME.
+    reference = make_track(
+        path_id=100,
+        first_lead=24,
+        last_lead=72,
+        n=9,
+        latitude=23.5,
+        longitude=246.0,   # 114 W
+    )
+
+    reference_records = earth2studio_track_to_records(
+        reference,
+        initialization_time="2026-09-26T12:00:00",
+    )
+
+    # Wrong current-cycle candidate: new eastern-Pacific system
+    # (Rachel-like location), but still inside the broad eastern region.
+    new_eastern_system = make_track(
+        path_id=200,
+        first_lead=0,
+        last_lead=48,
+        n=9,
+        latitude=12.0,
+        longitude=262.0,   # 98 W
+    )
+
+    # Correct current-cycle continuation of Polo near Baja California.
+    polo_continuation = make_track(
+        path_id=201,
+        first_lead=0,
+        last_lead=48,
+        n=9,
+        latitude=24.0,
+        longitude=246.5,   # 113.5 W
+    )
+
+    match = select_matching_track(
+        reference_records,
+        [new_eastern_system, polo_continuation],
+        initialization_time="2026-09-27T12:00:00",
+        minimum_overlap=2,
+        maximum_mean_error_km=600.0,
+        reference_name="previous_cycle",
+        candidate_name="current_cycle",
+    )
+
+    assert match is not None
+    assert match.track is polo_continuation
+    assert match.track.path_id == 201
+    assert match.overlap_count >= 2
+    assert match.mean_track_error_km < 600.0
