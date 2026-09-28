@@ -165,3 +165,12 @@ def test_load_track_rejects_missing_columns(
         raise AssertionError(
             "Expected ValueError for missing longitude"
         )
+
+def test_rachel_plotting_domain():
+    assert MODULE.DOMAINS["Rachel"] == (
+        -125.0,
+        -90.0,
+        5.0,
+        30.0,
+    )
+
