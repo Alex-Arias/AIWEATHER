@@ -20,10 +20,15 @@ import json
 import subprocess
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from aiweather.forecast import open_forecast
 from aiweather.tracking import build_native_tc_tracks
+from aiweather.tracking.comparison import (
+    compare_tracks_by_valid_time,
+)
+from aiweather.tracking.records import TrackRecord
 
 
 LAT_MIN = 5.0
@@ -47,6 +52,36 @@ def parse_args():
         "--init",
         required=True,
         help="Initialization time as YYYYMMDDTHHMMSS.",
+    )
+
+    parser.add_argument(
+        "--reference-init",
+        default=None,
+        help=(
+            "Previous operational initialization used for storm "
+            "continuity association. If omitted, selection uses the "
+            "original geographic classification."
+        ),
+    )
+
+    parser.add_argument(
+        "--association-minimum-overlap",
+        type=int,
+        default=2,
+        help=(
+            "Minimum exact common valid times required for "
+            "storm continuity association."
+        ),
+    )
+
+    parser.add_argument(
+        "--association-maximum-mean-error-km",
+        type=float,
+        default=600.0,
+        help=(
+            "Maximum mean track separation allowed for "
+            "storm continuity association."
+        ),
     )
 
     parser.add_argument(
@@ -113,6 +148,153 @@ def forecast_paths(init):
     }
 
 
+
+def operational_track_path(
+    *,
+    storm_name,
+    init,
+    model,
+):
+    """
+    Return the exported Native operational-track path.
+    """
+    return (
+        Path("results")
+        / "operational"
+        / f"{storm_name.lower()}_{init}"
+        / model
+        / f"{model}_track.csv"
+    )
+
+
+def load_exported_track(path):
+    """
+    Reconstruct TrackRecord objects from an exported Native CSV.
+    """
+    path = Path(path)
+
+    if not path.is_file():
+        return None
+
+    table = pd.read_csv(path)
+
+    required = {
+        "lead_time_hours",
+        "valid_time",
+        "latitude",
+        "longitude",
+        "pressure",
+        "max_wind",
+    }
+
+    missing = required.difference(table.columns)
+
+    if missing:
+        raise ValueError(
+            "Exported track is missing required columns: "
+            + ", ".join(sorted(missing))
+        )
+
+    records = []
+
+    for row in table.itertuples(index=False):
+
+        pressure = (
+            None
+            if pd.isna(row.pressure)
+            else float(row.pressure)
+        )
+
+        max_wind = (
+            None
+            if pd.isna(row.max_wind)
+            else float(row.max_wind)
+        )
+
+        pressure_units = getattr(
+            row,
+            "pressure_units",
+            None,
+        )
+        if pd.isna(pressure_units):
+            pressure_units = None
+
+        wind_units = getattr(
+            row,
+            "wind_units",
+            None,
+        )
+        if pd.isna(wind_units):
+            wind_units = None
+
+        records.append(
+            TrackRecord(
+                lead_time_hours=int(
+                    row.lead_time_hours
+                ),
+                valid_time=np.datetime64(
+                    row.valid_time
+                ),
+                latitude=float(row.latitude),
+                longitude=float(row.longitude),
+                pressure=pressure,
+                pressure_units=pressure_units,
+                max_wind=max_wind,
+                wind_units=wind_units,
+                distance_km=None,
+                translation_speed_kmh=None,
+                bearing_degrees=None,
+                cumulative_distance_km=0.0,
+            )
+        )
+
+    return records
+
+
+
+def remove_native_track_products(
+    *,
+    storm_name,
+    init,
+    model,
+):
+    """
+    Remove stale Native operational-track products for one storm/model.
+
+    Only products owned by this Native exporter are removed:
+
+        <model>_track.csv
+        <model>_track.provenance.json
+
+    Tracker-specific WuDuan and Vitart products are intentionally
+    untouched.
+
+    Returns
+    -------
+    list[Path]
+        Paths that were actually removed.
+    """
+    output_dir = (
+        Path("results")
+        / "operational"
+        / f"{storm_name.lower()}_{init}"
+        / model
+    )
+
+    paths = [
+        output_dir / f"{model}_track.csv",
+        output_dir / f"{model}_track.provenance.json",
+    ]
+
+    removed = []
+
+    for product_path in paths:
+        if product_path.exists():
+            product_path.unlink()
+            removed.append(product_path)
+
+    return removed
+
 def records_dataframe(records):
     return pd.DataFrame(
         [
@@ -138,6 +320,109 @@ def records_dataframe(records):
         ]
     )
 
+
+
+
+def select_continuous_native_track(
+    results,
+    *,
+    reference_records,
+    minimum_overlap=2,
+    maximum_mean_error_km=600.0,
+):
+    """
+    Associate one native candidate with an existing storm track.
+
+    Candidate identity is evaluated at exact common valid times,
+    making this selector suitable for consecutive forecast cycles
+    with different initialization times.
+
+    A candidate is eligible only when it has at least
+    ``minimum_overlap`` common valid times with the reference and its
+    mean great-circle separation does not exceed
+    ``maximum_mean_error_km``.
+
+    Among eligible candidates, selection prefers the smallest mean
+    track separation, followed by greater overlap, earlier genesis,
+    lower genesis pressure, and lower native track index.
+
+    Returns
+    -------
+    tuple or None
+        ``(genesis, records, diagnostics)`` for the best eligible
+        candidate, or ``None`` when continuity cannot be established.
+    """
+    if minimum_overlap < 1:
+        raise ValueError(
+            "minimum_overlap must be at least 1."
+        )
+
+    if maximum_mean_error_km <= 0.0:
+        raise ValueError(
+            "maximum_mean_error_km must be positive."
+        )
+
+    if not reference_records:
+        raise ValueError(
+            "reference_records cannot be empty."
+        )
+
+    eligible = []
+
+    for genesis, records in results:
+        comparison = compare_tracks_by_valid_time(
+            records,
+            reference_records,
+            tracker_a="candidate",
+            tracker_b="reference",
+        )
+
+        overlap = comparison.overlap_count
+        mean_error = comparison.mean_track_error_km
+
+        if overlap < minimum_overlap:
+            continue
+
+        if not np.isfinite(mean_error):
+            continue
+
+        if mean_error > maximum_mean_error_km:
+            continue
+
+        diagnostics = {
+            "overlap_count":
+                overlap,
+            "mean_track_error_km":
+                mean_error,
+            "maximum_track_error_km":
+                comparison.maximum_track_error_km,
+            "minimum_overlap":
+                minimum_overlap,
+            "maximum_mean_error_km":
+                maximum_mean_error_km,
+        }
+
+        eligible.append(
+            (
+                genesis,
+                records,
+                diagnostics,
+            )
+        )
+
+    if not eligible:
+        return None
+
+    return min(
+        eligible,
+        key=lambda item: (
+            item[2]["mean_track_error_km"],
+            -item[2]["overlap_count"],
+            item[0].genesis_lead_time_hours,
+            item[0].pressure,
+            item[0].track_index,
+        ),
+    )
 
 
 def select_regional_native_track(
@@ -281,27 +566,148 @@ def main():
             "western",
             "eastern",
         ):
-            selected = select_regional_native_track(
-                results,
-                classification=classification,
-            )
+            storm_name = names[
+                classification
+            ]
 
-            if selected is None:
-                print(
-                    f"  {names[classification]:<8s} "
-                    "no qualifying native detection"
+            association = None
+            reference_path = None
+
+            if args.reference_init is not None:
+                reference_path = operational_track_path(
+                    storm_name=storm_name,
+                    init=args.reference_init,
+                    model=model,
                 )
-                continue
 
-            genesis, records = selected
+                reference_records = load_exported_track(
+                    reference_path
+                )
+
+                if reference_records is not None:
+                    selected = select_continuous_native_track(
+                        results,
+                        reference_records=reference_records,
+                        minimum_overlap=(
+                            args.association_minimum_overlap
+                        ),
+                        maximum_mean_error_km=(
+                            args.association_maximum_mean_error_km
+                        ),
+                    )
+
+                    if selected is None:
+                        removed = remove_native_track_products(
+                            storm_name=storm_name,
+                            init=init,
+                            model=model,
+                        )
+
+                        print(
+                            f"  {storm_name:<8s} "
+                            "no continuity-associated native detection"
+                        )
+
+                        for removed_path in removed:
+                            print(
+                                "    removed stale Native product:",
+                                removed_path,
+                            )
+
+                        continue
+
+                    genesis, records, diagnostics = selected
+
+                    association = {
+                        "method":
+                            "previous_cycle_valid_time_continuity",
+                        "reference_init":
+                            args.reference_init,
+                        "reference_track":
+                            str(reference_path),
+                        "minimum_overlap":
+                            args.association_minimum_overlap,
+                        "maximum_mean_error_km":
+                            args.association_maximum_mean_error_km,
+                        "overlap_count":
+                            diagnostics["overlap_count"],
+                        "mean_track_error_km":
+                            diagnostics["mean_track_error_km"],
+                    }
+
+                else:
+                    selected = select_regional_native_track(
+                        results,
+                        classification=classification,
+                    )
+
+                    if selected is None:
+                        removed = remove_native_track_products(
+                            storm_name=storm_name,
+                            init=init,
+                            model=model,
+                        )
+
+                        print(
+                            f"  {storm_name:<8s} "
+                            "no qualifying native detection"
+                        )
+
+                        for removed_path in removed:
+                            print(
+                                "    removed stale Native product:",
+                                removed_path,
+                            )
+
+                        continue
+
+                    genesis, records = selected
+
+                    association = {
+                        "method":
+                            "regional_fallback_missing_reference",
+                        "reference_init":
+                            args.reference_init,
+                        "reference_track":
+                            str(reference_path),
+                    }
+
+            else:
+                selected = select_regional_native_track(
+                    results,
+                    classification=classification,
+                )
+
+                if selected is None:
+                    removed = remove_native_track_products(
+                        storm_name=storm_name,
+                        init=init,
+                        model=model,
+                    )
+
+                    print(
+                        f"  {storm_name:<8s} "
+                        "no qualifying native detection"
+                    )
+
+                    for removed_path in removed:
+                        print(
+                            "    removed stale Native product:",
+                            removed_path,
+                        )
+
+                    continue
+
+                genesis, records = selected
+
+                association = {
+                    "method":
+                        "regional_classification",
+                }
 
             genesis_lon_180 = lon180(
                 genesis.longitude
             )
-
-            storm_name = names[
-                classification
-            ]
 
             storm_slug = storm_name.lower()
 
@@ -361,6 +767,8 @@ def main():
                     CLASSIFICATION_LONGITUDE,
                 "maximum_translation_speed_mps":
                     MAXIMUM_TRANSLATION_SPEED_MPS,
+                "storm_association":
+                    association,
                 "native_detection": {
                     "track_index":
                         genesis.track_index,
