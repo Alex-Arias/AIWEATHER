@@ -7,6 +7,7 @@ import pytest
 from aiweather.tracking.records import TrackRecord
 
 from scripts.export_multisystem_native_tracks import (
+    allow_regional_fallback,
     remove_native_track_products,
     select_continuous_native_track,
     select_regional_native_track,
@@ -457,3 +458,61 @@ def test_remove_native_track_products_is_safe_when_absent(
     )
 
     assert removed == []
+
+
+def test_regional_fallback_allowed_without_reference_request():
+    """
+    First-cycle/discovery mode may use geographic classification.
+    """
+    assert allow_regional_fallback(
+        reference_init=None,
+    )
+
+
+def test_missing_requested_reference_disables_regional_fallback():
+    """
+    Regression for Cycle 9.
+
+    If --reference-init was explicitly supplied but that model has no
+    previous-cycle Native track, regional classification must not assign
+    a different eastern-Pacific system to the established storm.
+    """
+    assert not allow_regional_fallback(
+        reference_init="20260927T120000",
+    )
+
+
+def test_empty_native_summary_schema_can_be_sorted():
+    """
+    Regression for Cycle 9.
+
+    Strict storm continuity can legitimately reject every Native
+    candidate.  An empty detection summary must therefore retain its
+    expected columns and remain sortable rather than raising KeyError.
+    """
+    import pandas as pd
+
+    summary_columns = [
+        "storm",
+        "model",
+        "genesis_lead_hours",
+        "genesis_latitude",
+        "genesis_longitude",
+        "genesis_pressure_pa",
+        "genesis_max_wind_ms",
+        "track_points",
+        "last_lead_hours",
+    ]
+
+    summary = pd.DataFrame(
+        [],
+        columns=summary_columns,
+    ).sort_values(
+        [
+            "storm",
+            "model",
+        ]
+    )
+
+    assert summary.empty
+    assert list(summary.columns) == summary_columns

@@ -252,6 +252,19 @@ def load_exported_track(path):
 
 
 
+def allow_regional_fallback(*, reference_init):
+    """
+    Return whether regional storm classification may be used.
+
+    Regional classification is appropriate only for discovery when no
+    previous-cycle reference was requested.  Once --reference-init is
+    supplied, storm identity must be established by valid-time
+    continuity; a missing reference must not silently fall back to
+    geographic classification.
+    """
+    return reference_init is None
+
+
 def remove_native_track_products(
     *,
     storm_name,
@@ -636,12 +649,9 @@ def main():
                     }
 
                 else:
-                    selected = select_regional_native_track(
-                        results,
-                        classification=classification,
-                    )
-
-                    if selected is None:
+                    if not allow_regional_fallback(
+                        reference_init=args.reference_init,
+                    ):
                         removed = remove_native_track_products(
                             storm_name=storm_name,
                             init=init,
@@ -650,7 +660,13 @@ def main():
 
                         print(
                             f"  {storm_name:<8s} "
-                            "no qualifying native detection"
+                            "reference Native track missing; "
+                            "regional fallback disabled"
+                        )
+
+                        print(
+                            "    reference:",
+                            reference_path,
                         )
 
                         for removed_path in removed:
@@ -661,16 +677,10 @@ def main():
 
                         continue
 
-                    genesis, records = selected
-
-                    association = {
-                        "method":
-                            "regional_fallback_missing_reference",
-                        "reference_init":
-                            args.reference_init,
-                        "reference_track":
-                            str(reference_path),
-                    }
+                    raise RuntimeError(
+                        "Unexpected regional-fallback state with "
+                        "an explicit reference initialization"
+                    )
 
             else:
                 selected = select_regional_native_track(
@@ -841,8 +851,21 @@ def main():
                 csv_path,
             )
 
+    summary_columns = [
+        "storm",
+        "model",
+        "genesis_lead_hours",
+        "genesis_latitude",
+        "genesis_longitude",
+        "genesis_pressure_pa",
+        "genesis_max_wind_ms",
+        "track_points",
+        "last_lead_hours",
+    ]
+
     summary = pd.DataFrame(
-        summary_rows
+        summary_rows,
+        columns=summary_columns,
     ).sort_values(
         [
             "storm",
