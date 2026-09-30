@@ -736,14 +736,14 @@ fig.tight_layout()
 png_path = (
     OUTPUT_DIR
     / (
-        f"{STORM_KEY}_cycle1_wave_hovmoller.png"
+        f"{STORM_KEY}_{INIT}_wave_hovmoller.png"
     )
 )
 
 pdf_path = (
     OUTPUT_DIR
     / (
-        f"{STORM_KEY}_cycle1_wave_hovmoller.pdf"
+        f"{STORM_KEY}_{INIT}_wave_hovmoller.pdf"
     )
 )
 
@@ -834,7 +834,7 @@ radial_table = pd.DataFrame(
 csv_path = (
     OUTPUT_DIR
     / (
-        f"{STORM_KEY}_cycle1_wave_radial_profiles.csv"
+        f"{STORM_KEY}_{INIT}_wave_radial_profiles.csv"
     )
 )
 

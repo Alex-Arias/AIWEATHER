@@ -51,9 +51,21 @@ def test_operational_hovmoller_uses_expected_radial_domain():
 def test_operational_hovmoller_writes_expected_products():
     text = SCRIPT.read_text()
 
-    assert "wave_hovmoller.png" in text
-    assert "wave_hovmoller.pdf" in text
-    assert "wave_radial_profiles.csv" in text
+    assert (
+        'f"{STORM_KEY}_{INIT}_wave_hovmoller.png"'
+        in text
+    )
+    assert (
+        'f"{STORM_KEY}_{INIT}_wave_hovmoller.pdf"'
+        in text
+    )
+    assert (
+        'f"{STORM_KEY}_{INIT}_wave_radial_profiles.csv"'
+        in text
+    )
+
+    assert "_cycle1_wave_hovmoller" not in text
+    assert "_cycle1_wave_radial_profiles" not in text
 
 
 def test_operational_hovmoller_is_forecast_only():
