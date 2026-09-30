@@ -8,6 +8,7 @@ Forecast cycles are compared at common valid times rather than common
 forecast lead times.
 """
 
+import argparse
 from pathlib import Path
 
 import matplotlib.dates as mdates
@@ -15,9 +16,33 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-STORMS = ("Odalys", "Polo")
+DEFAULT_STORMS = ("Odalys", "Polo")
 WAVE_ROOT = Path("results/waves")
 INIT_HOUR_UTC = 12
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Compare consecutive operational AIFS2 wave "
+            "forecast cycles for one or more tropical cyclones."
+        )
+    )
+
+    parser.add_argument(
+        "--storms",
+        nargs="+",
+        default=list(DEFAULT_STORMS),
+        help=(
+            "Storms to compare. Default: Odalys Polo."
+        ),
+    )
+
+    return parser.parse_args()
+
+
+ARGS = parse_args()
+STORMS = tuple(ARGS.storms)
 
 
 def discover_cases():
@@ -193,12 +218,15 @@ for storm, cycles in CASES.items():
         data[storm][label] = load_case(config)
 
 
+n_storms = len(STORMS)
+
 fig, axes = plt.subplots(
     3,
-    2,
-    figsize=(14, 11),
+    n_storms,
+    figsize=(7 * n_storms, 11),
     sharex="col",
     constrained_layout=True,
+    squeeze=False,
 )
 
 line_styles = [
@@ -218,7 +246,7 @@ cycle_styles = {
 }
 
 
-for column, storm in enumerate(("Odalys", "Polo")):
+for column, storm in enumerate(STORMS):
 
     ax_swh = axes[0, column]
     ax_wind = axes[1, column]
@@ -404,9 +432,14 @@ fig.suptitle(
 )
 
 
+storm_slug = "_".join(
+    storm.lower()
+    for storm in STORMS
+)
+
 output = Path(
     "outputs/verification/"
-    f"polo_odalys_wave_cycles_"
+    f"{storm_slug}_wave_cycles_"
     f"{first_cycle.strftime('%Y%m%d')}_"
     f"{last_cycle.strftime('%Y%m%d')}.png"
 )
