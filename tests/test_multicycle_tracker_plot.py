@@ -85,3 +85,12 @@ def test_track_path_vitart():
         "pangu6/"
         "pangu6_vitart_track.csv"
     )
+
+
+def test_rachel_plotting_domain():
+    assert MODULE.DOMAINS["Rachel"] == (
+        -125.0,
+        -90.0,
+        5.0,
+        30.0,
+    )
