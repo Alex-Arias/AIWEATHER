@@ -212,6 +212,99 @@ def records_to_dataframe(records):
     )
 
 
+def select_existing_storm_track_continuity(
+    previous_records,
+    tracks,
+    *,
+    initialization_time,
+    minimum_overlap=2,
+    maximum_mean_error_km=600.0,
+    continuity_window_hours=72,
+):
+    """
+    Select a tracker candidate using early valid-time continuity.
+
+    This is intended for Cycle 2 and later operational forecasts.
+    Only previous-cycle reference records whose valid times fall
+    between the current initialization and the end of the
+    continuity window are used for association.
+
+    Late forecast divergence therefore cannot dominate storm
+    identity selection.
+    """
+
+    if continuity_window_hours <= 0:
+        raise ValueError(
+            "continuity_window_hours must be positive."
+        )
+
+    current_initialization = pd.Timestamp(
+        initialization_time
+    )
+
+    continuity_end = (
+        current_initialization
+        + pd.Timedelta(
+            hours=continuity_window_hours
+        )
+    )
+
+    continuity_reference = []
+
+    for record in previous_records:
+
+        valid_time = pd.Timestamp(
+            record.valid_time
+        )
+
+        if (
+            current_initialization
+            <= valid_time
+            <= continuity_end
+        ):
+            rebased_lead_hours = int(
+                (
+                    valid_time
+                    - current_initialization
+                ).total_seconds()
+                / 3600
+            )
+
+            continuity_reference.append(
+                type(record)(
+                    lead_time_hours=rebased_lead_hours,
+                    valid_time=record.valid_time,
+                    latitude=record.latitude,
+                    longitude=record.longitude,
+                    pressure=record.pressure,
+                    pressure_units=record.pressure_units,
+                    max_wind=record.max_wind,
+                    wind_units=record.wind_units,
+                    distance_km=record.distance_km,
+                    translation_speed_kmh=(
+                        record.translation_speed_kmh
+                    ),
+                    bearing_degrees=record.bearing_degrees,
+                    cumulative_distance_km=(
+                        record.cumulative_distance_km
+                    ),
+                )
+            )
+
+    if len(continuity_reference) < minimum_overlap:
+        return None
+
+    return select_matching_track(
+        continuity_reference,
+        tracks,
+        initialization_time=initialization_time,
+        minimum_overlap=minimum_overlap,
+        maximum_mean_error_km=maximum_mean_error_km,
+        reference_name="previous_cycle_continuity",
+        candidate_name="tracker_candidate",
+    )
+
+
 def select_existing_storm_track(
     reference_records,
     tracks,
@@ -415,20 +508,37 @@ def main():
                 )
             )
 
-            match = select_existing_storm_track(
-                reference_records,
-                tracks,
-                initialization_time=(
-                    initialization_time
-                ),
-                minimum_overlap=(
-                    args.association_minimum_overlap
-                ),
-                maximum_mean_error_km=(
-                    args
-                    .association_maximum_mean_error_km
-                ),
-            )
+            if args.reference_init is None:
+                match = select_existing_storm_track(
+                    reference_records,
+                    tracks,
+                    initialization_time=(
+                        initialization_time
+                    ),
+                    minimum_overlap=(
+                        args.association_minimum_overlap
+                    ),
+                    maximum_mean_error_km=(
+                        args
+                        .association_maximum_mean_error_km
+                    ),
+                )
+            else:
+                match = select_existing_storm_track_continuity(
+                    reference_records,
+                    tracks,
+                    initialization_time=(
+                        initialization_time
+                    ),
+                    minimum_overlap=(
+                        args.association_minimum_overlap
+                    ),
+                    maximum_mean_error_km=(
+                        args
+                        .association_maximum_mean_error_km
+                    ),
+                    continuity_window_hours=72,
+                )
 
             if match is None:
                 print(
