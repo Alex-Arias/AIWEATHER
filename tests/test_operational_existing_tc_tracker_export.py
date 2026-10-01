@@ -405,3 +405,47 @@ def test_cycle2_continuity_rebases_previous_leads_to_current_init(
         datetime(2026, 9, 29, 18),
         datetime(2026, 9, 30, 0),
     ]
+
+
+def test_previous_tracker_missing_falls_back_to_current_native():
+    """Missing previous same-tracker reference must use current Native."""
+    script = Path(
+        "scripts/export_existing_tc_tracker_tracks.py"
+    )
+    text = script.read_text()
+
+    assert (
+        "if previous_reference_path.is_file():"
+        in text
+    )
+
+    assert (
+        '"previous_cycle_valid_time_continuity"'
+        in text
+    )
+
+    assert (
+        '"current_cycle_seeded_native_fallback"'
+        in text
+    )
+
+    assert (
+        "reference_path = (\n"
+        "                        native_reference_path("
+        in text
+    )
+
+    assert (
+        'if association_method in {'
+        in text
+    )
+
+    assert (
+        '"current_cycle_seeded_native_reference",'
+        in text
+    )
+
+    assert (
+        '"current_cycle_seeded_native_fallback",'
+        in text
+    )

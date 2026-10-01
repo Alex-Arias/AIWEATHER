@@ -483,7 +483,7 @@ def main():
                     "current_cycle_seeded_native_reference"
                 )
             else:
-                reference_path = (
+                previous_reference_path = (
                     previous_tracker_reference_path(
                         storm_name=args.storm_name,
                         init=args.reference_init,
@@ -492,9 +492,39 @@ def main():
                     )
                 )
 
-                association_method = (
-                    "previous_cycle_valid_time_continuity"
-                )
+                if previous_reference_path.is_file():
+                    reference_path = previous_reference_path
+                    association_method = (
+                        "previous_cycle_valid_time_continuity"
+                    )
+                else:
+                    reference_path = (
+                        native_reference_path(
+                            storm_name=args.storm_name,
+                            init=init,
+                            model=model,
+                        )
+                    )
+                    association_method = (
+                        "current_cycle_seeded_native_fallback"
+                    )
+
+                    print(
+                        "  Previous-cycle "
+                        f"{tracker_name.upper()} reference unavailable."
+                    )
+                    print(
+                        "  Falling back to current-cycle "
+                        "frozen Native track."
+                    )
+                    print(
+                        "    missing:",
+                        previous_reference_path,
+                    )
+                    print(
+                        "    fallback:",
+                        reference_path,
+                    )
 
             if not reference_path.is_file():
                 raise FileNotFoundError(
@@ -508,7 +538,10 @@ def main():
                 )
             )
 
-            if args.reference_init is None:
+            if association_method in {
+                "current_cycle_seeded_native_reference",
+                "current_cycle_seeded_native_fallback",
+            }:
                 match = select_existing_storm_track(
                     reference_records,
                     tracks,
