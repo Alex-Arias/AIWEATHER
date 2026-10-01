@@ -4,7 +4,7 @@ Run AIFS2 wave analysis for all storms in one operational cycle.
 The wrapper discovers storms from existing operational AIFS2 track
 products, validates each case with analyze_aifs2_waves.py --dry-run,
 runs the wave analysis for cases that pass validation, and optionally
-updates the Odalys/Polo multicycle comparison.
+updates the multicycle comparison for the storms discovered in the current operational cycle.
 
 One storm failure does not prevent the remaining storms from running.
 """
@@ -321,6 +321,8 @@ def main():
             [
                 sys.executable,
                 str(MULTICYCLE),
+                "--storms",
+                *storms,
             ]
         )
 
