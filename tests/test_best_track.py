@@ -207,3 +207,40 @@ def test_best_track_to_records_invalid_valid_time():
             points,
             initialization_time=INITIALIZATION_TIME,
         )
+
+def test_best_track_to_records_compact_initialization_time():
+    """Accept AIWeather YYYYMMDDTHHMMSS initialization strings."""
+
+    points = [
+        BestTrackPoint(
+            valid_time=np.datetime64(
+                "2026-09-20T12:00:00"
+            ),
+            latitude=10.0,
+            longitude=-105.0,
+        ),
+        BestTrackPoint(
+            valid_time=np.datetime64(
+                "2026-09-20T18:00:00"
+            ),
+            latitude=10.5,
+            longitude=-106.0,
+        ),
+    ]
+
+    records = best_track_to_records(
+        points,
+        initialization_time="20260920T120000",
+    )
+
+    assert [
+        record.lead_time_hours
+        for record in records
+    ] == [0, 6]
+
+    assert records[0].valid_time == np.datetime64(
+        "2026-09-20T12:00:00"
+    )
+    assert records[1].valid_time == np.datetime64(
+        "2026-09-20T18:00:00"
+    )

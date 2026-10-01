@@ -95,6 +95,20 @@ def best_track_to_records(
                 "points must contain BestTrackPoint objects."
             )
 
+    if (
+        isinstance(initialization_time, str)
+        and len(initialization_time) == 15
+        and initialization_time[8] == "T"
+    ):
+        initialization_time = (
+            f"{initialization_time[:4]}-"
+            f"{initialization_time[4:6]}-"
+            f"{initialization_time[6:8]}T"
+            f"{initialization_time[9:11]}:"
+            f"{initialization_time[11:13]}:"
+            f"{initialization_time[13:15]}"
+        )
+
     initialization = np.datetime64(
         initialization_time
     )
