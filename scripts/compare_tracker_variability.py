@@ -192,6 +192,45 @@ def main():
     start = pd.Timestamp(args.start)
     end = pd.Timestamp(args.end)
 
+    # Determine the operational cycle dynamically from the frozen
+    # lagged-member products rather than hard-coding a cycle number.
+    latest_cycles = {}
+
+    for tracker, tracker_dir in [
+        (args.tracker_a, Path(args.tracker_a_dir)),
+        (args.tracker_b, Path(args.tracker_b_dir)),
+    ]:
+        members_path = (
+            tracker_dir
+            / f"{args.storm.lower()}_{tracker}_lagged_members.csv"
+        )
+
+        if not members_path.exists():
+            raise FileNotFoundError(
+                f"Missing lagged-members file: {members_path}"
+            )
+
+        members = pd.read_csv(members_path)
+
+        if "cycle" not in members.columns:
+            raise ValueError(
+                f"Missing cycle column in {members_path}"
+            )
+
+        latest_cycles[tracker] = int(members["cycle"].max())
+
+    if len(set(latest_cycles.values())) != 1:
+        raise ValueError(
+            "Tracker latest-cycle mismatch: "
+            + ", ".join(
+                f"{tracker}={cycle}"
+                for tracker, cycle in latest_cycles.items()
+            )
+        )
+
+    latest_cycle = next(iter(latest_cycles.values()))
+    recent_start_cycle = max(1, latest_cycle - 2)
+
     if end < start:
         raise ValueError("--end must not precede --start")
 
@@ -331,11 +370,11 @@ def main():
         ),
         (
             "variability_recent3",
-            "Recent — cycles 3–5",
+            f"Recent — cycles {recent_start_cycle}–{latest_cycle}",
         ),
         (
             "variability_latest",
-            "Current — cycle 5",
+            f"Current — cycle {latest_cycle}",
         ),
     ]
 
@@ -384,7 +423,7 @@ def main():
 
     figure_path = (
         outdir
-        / f"{args.storm.lower()}_cycle5_"
+        / f"{args.storm.lower()}_cycle{latest_cycle}_"
           "wuduan_vitart_matched_comparison.png"
     )
 
