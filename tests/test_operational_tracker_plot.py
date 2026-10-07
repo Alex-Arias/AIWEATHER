@@ -174,3 +174,32 @@ def test_rachel_plotting_domain():
         30.0,
     )
 
+
+
+def test_storm_slug_with_space():
+    assert MODULE.storm_slug("INVEST 92E") == "invest_92e"
+
+
+def test_track_path_invest_with_space():
+    path = MODULE.track_path(
+        "INVEST 92E",
+        "graphcast",
+        "wuduan",
+        "20261006T120000",
+    )
+
+    assert path == Path(
+        "results/operational/"
+        "invest_92e_20261006T120000/"
+        "graphcast/"
+        "graphcast_wuduan_track.csv"
+    )
+
+
+def test_invest_92e_plotting_domain():
+    assert MODULE.DOMAINS["INVEST 92E"] == (
+        -125.0,
+        -90.0,
+        5.0,
+        30.0,
+    )

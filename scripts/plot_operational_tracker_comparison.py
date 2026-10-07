@@ -61,13 +61,24 @@ DOMAINS = {
     "Odalys": (-140.0, -110.0, 8.0, 34.0),
     "Polo": (-125.0, -90.0, 8.0, 34.0),
     "Rachel": (-125.0, -90.0, 5.0, 30.0),
+    "INVEST 92E": (-125.0, -90.0, 5.0, 30.0),
 }
 
 
+def storm_slug(name):
+    """Return the canonical operational directory slug for a storm."""
+    return (
+        name.lower()
+        .replace(" ", "_")
+    )
+
+
 def track_path(storm, model, tracker, init):
+    slug = storm_slug(storm)
+
     base = (
         Path("results/operational")
-        / f"{storm.lower()}_{init}"
+        / f"{slug}_{init}"
         / model
     )
 
