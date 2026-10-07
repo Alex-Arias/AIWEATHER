@@ -74,9 +74,18 @@ def parse_args():
     return parser.parse_args()
 
 
+def storm_slug(name):
+    """Return the canonical filesystem slug for a storm name."""
+    return (
+        name.strip()
+        .lower()
+        .replace(" ", "_")
+    )
+
+
 def discover_cycles(root, storm):
 
-    prefix = f"{storm.lower()}_"
+    prefix = f"{storm_slug(storm)}_"
 
     directories = sorted(
         p
@@ -297,7 +306,7 @@ def main():
     )
 
     stem = (
-        f"{args.storm.lower()}_"
+        f"{storm_slug(args.storm)}_"
         f"{args.tracker.lower()}"
     )
 

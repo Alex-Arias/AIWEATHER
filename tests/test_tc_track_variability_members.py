@@ -309,3 +309,37 @@ def test_load_track_preserves_longitude_convention(tmp_path):
     assert result.iloc[0]["longitude"] == pytest.approx(
         240.0
     )
+
+
+def test_storm_slug_with_space():
+    from scripts.tc_track_variability_members import storm_slug
+
+    assert storm_slug("INVEST 92E") == "invest_92e"
+    assert storm_slug("invest_92e") == "invest_92e"
+
+
+def test_discover_cycles_with_spaced_storm_name(tmp_path):
+    from scripts.tc_track_variability_members import discover_cycles
+
+    (tmp_path / "invest_92e_20261006T120000").mkdir()
+    (tmp_path / "invest_92e_20261007T120000").mkdir()
+
+    # Unrelated operational case must not be selected.
+    (tmp_path / "rachel_20261005T120000").mkdir()
+
+    cycles = discover_cycles(
+        tmp_path,
+        "INVEST 92E",
+    )
+
+    assert len(cycles) == 2
+
+    directories = [
+        item[1].name
+        for item in cycles
+    ]
+
+    assert directories == [
+        "invest_92e_20261006T120000",
+        "invest_92e_20261007T120000",
+    ]
