@@ -73,13 +73,21 @@ parser.add_argument(
 args = parser.parse_args()
 
 
+def storm_slug(name):
+    """Return the canonical filesystem slug for a storm name."""
+    return (
+        name.lower()
+        .replace(" ", "_")
+    )
+
+
 def build_operational_case(
     storm,
     init,
 ):
     """Construct one operational AIFS2 wave-analysis case."""
 
-    storm_key = storm.lower()
+    storm_key = storm_slug(storm)
 
     # Operational initialization must use the canonical
     # AIWeather timestamp format: YYYYMMDDTHHMMSS.
@@ -177,7 +185,8 @@ def build_operational_case(
         )
 
     return {
-        "storm_name": storm_key.title(),
+        "storm_name": storm_key.replace("_", " ").title(),
+        "storm_slug": storm_key,
         "init": init,
         "case_id": f"{storm_key}_{init}",
         "center_source": center_source,
@@ -238,7 +247,7 @@ if args.init is None:
     STORM_KEY = args.storm.lower()
 else:
     STORM_KEY = (
-        f"{args.storm.lower()}_"
+        f"{storm_slug(args.storm)}_"
         f"{args.init[:8]}"
     )
 
@@ -1159,7 +1168,7 @@ for lead_hours in LEAD_TIMES:
     png_path = (
         OUTPUT_DIR
         / (
-            f"aifs2_{STORM_NAME.lower()}_"
+            f"aifs2_{CASE.get('storm_slug', STORM_NAME.lower())}_"
             f"wave_{lead_hours:03d}h.png"
         )
     )
@@ -1167,7 +1176,7 @@ for lead_hours in LEAD_TIMES:
     pdf_path = (
         OUTPUT_DIR
         / (
-            f"aifs2_{STORM_NAME.lower()}_"
+            f"aifs2_{CASE.get('storm_slug', STORM_NAME.lower())}_"
             f"wave_{lead_hours:03d}h.pdf"
         )
     )
@@ -1443,7 +1452,7 @@ diagnostics = diagnostics.sort_values(
 csv_path = (
     OUTPUT_DIR
     / (
-        f"aifs2_{STORM_NAME.lower()}_"
+        f"aifs2_{CASE.get('storm_slug', STORM_NAME.lower())}_"
         "wave_diagnostics.csv"
     )
 )
@@ -1514,7 +1523,7 @@ fig.tight_layout()
 swh_png = (
     OUTPUT_DIR
     / (
-        f"aifs2_{STORM_NAME.lower()}_"
+        f"aifs2_{CASE.get('storm_slug', STORM_NAME.lower())}_"
         "storm_relative_swh.png"
     )
 )
@@ -1522,7 +1531,7 @@ swh_png = (
 swh_pdf = (
     OUTPUT_DIR
     / (
-        f"aifs2_{STORM_NAME.lower()}_"
+        f"aifs2_{CASE.get('storm_slug', STORM_NAME.lower())}_"
         "storm_relative_swh.pdf"
     )
 )
