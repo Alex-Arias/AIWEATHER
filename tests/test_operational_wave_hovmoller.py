@@ -75,3 +75,29 @@ def test_operational_hovmoller_is_forecast_only():
     # than invoking forecast inference or TC verification.
     assert "ibtracs" not in text
     assert "best_track" not in text
+
+
+def test_operational_hovmoller_defines_storm_slug():
+    text = SCRIPT.read_text()
+
+    assert '''def storm_slug(name):
+    """Return the canonical filesystem slug for a storm name."""
+    return (
+        name.strip()
+        .lower()
+        .replace(" ", "_")
+    )
+''' in text
+
+
+def test_operational_hovmoller_uses_slug_for_paths():
+    text = SCRIPT.read_text()
+
+    assert "STORM_KEY = storm_slug(args.storm)" in text
+    assert (
+        'STORM_NAME = args.storm.strip().replace("_", " ")'
+        in text
+    )
+
+    # Do not regress to literal-space filesystem keys.
+    assert "STORM_KEY = STORM_NAME.lower()" not in text

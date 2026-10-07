@@ -37,8 +37,18 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-STORM_NAME = args.storm.strip()
-STORM_KEY = STORM_NAME.lower()
+
+def storm_slug(name):
+    """Return the canonical filesystem slug for a storm name."""
+    return (
+        name.strip()
+        .lower()
+        .replace(" ", "_")
+    )
+
+
+STORM_NAME = args.storm.strip().replace("_", " ")
+STORM_KEY = storm_slug(args.storm)
 INIT = args.init.strip()
 
 CASE_ID = (
