@@ -62,6 +62,15 @@ parser.add_argument(
 
 
 parser.add_argument(
+    "--experiment-slug",
+    default=None,
+    help=(
+        "Persistent operational experiment directory slug. "
+        "Defaults to the normalized storm name."
+    ),
+)
+
+parser.add_argument(
     "--dry-run",
     action="store_true",
     help=(
@@ -84,10 +93,26 @@ def storm_slug(name):
 def build_operational_case(
     storm,
     init,
+    experiment_slug=None,
 ):
     """Construct one operational AIFS2 wave-analysis case."""
 
     storm_key = storm_slug(storm)
+
+    experiment_key = (
+        storm_key
+        if experiment_slug is None
+        else experiment_slug
+    )
+
+    if not experiment_key or not all(
+        character in "abcdefghijklmnopqrstuvwxyz0123456789_"
+        for character in experiment_key
+    ):
+        raise ValueError(
+            "Experiment slug must contain only lowercase "
+            "letters, digits, and underscores."
+        )
 
     # Operational initialization must use the canonical
     # AIWeather timestamp format: YYYYMMDDTHHMMSS.
@@ -117,7 +142,7 @@ def build_operational_case(
 
     operational_dir = (
         Path("results/operational")
-        / f"{storm_key}_{init}"
+        / f"{experiment_key}_{init}"
         / "aifs2"
     )
 
@@ -187,8 +212,9 @@ def build_operational_case(
     return {
         "storm_name": storm_key.replace("_", " ").title(),
         "storm_slug": storm_key,
+        "experiment_slug": experiment_key,
         "init": init,
-        "case_id": f"{storm_key}_{init}",
+        "case_id": f"{experiment_key}_{init}",
         "center_source": center_source,
         "center_path": str(center_path),
         "forecast_path": str(
@@ -224,6 +250,7 @@ else:
     CASE = build_operational_case(
         args.storm,
         args.init,
+        experiment_slug=args.experiment_slug,
     )
 
 CENTER_SOURCE = CASE.get(
@@ -247,7 +274,7 @@ if args.init is None:
     STORM_KEY = args.storm.lower()
 else:
     STORM_KEY = (
-        f"{storm_slug(args.storm)}_"
+        f"{CASE.get('experiment_slug', storm_slug(args.storm))}_"
         f"{args.init[:8]}"
     )
 

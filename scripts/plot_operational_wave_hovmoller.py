@@ -35,6 +35,15 @@ parser.add_argument(
     help="Initialization in YYYYMMDDTHHMMSS format.",
 )
 
+parser.add_argument(
+    "--experiment-slug",
+    default=None,
+    help=(
+        "Persistent operational experiment directory slug. "
+        "Defaults to the normalized storm name."
+    ),
+)
+
 args = parser.parse_args()
 
 
@@ -49,10 +58,26 @@ def storm_slug(name):
 
 STORM_NAME = args.storm.strip().replace("_", " ")
 STORM_KEY = storm_slug(args.storm)
+
+EXPERIMENT_KEY = (
+    STORM_KEY
+    if args.experiment_slug is None
+    else args.experiment_slug
+)
+
+if not EXPERIMENT_KEY or not all(
+    character in "abcdefghijklmnopqrstuvwxyz0123456789_"
+    for character in EXPERIMENT_KEY
+):
+    raise ValueError(
+        "Experiment slug must contain only lowercase "
+        "letters, digits, and underscores."
+    )
+
 INIT = args.init.strip()
 
 CASE_ID = (
-    f"operational_{STORM_KEY}_{INIT.lower()}"
+    f"operational_{EXPERIMENT_KEY}_{INIT.lower()}"
 )
 
 CENTER_SOURCE = "native"
@@ -70,14 +95,14 @@ FORECAST_PATH = (
 
 TRACK_PATH = (
     Path("results/operational")
-    / f"{STORM_KEY}_{INIT}"
+    / f"{EXPERIMENT_KEY}_{INIT}"
     / "aifs2"
     / "aifs2_track.csv"
 )
 
 OUTPUT_DIR = (
     Path("results/waves")
-    / f"aifs2_{STORM_KEY}_{INIT[:8]}"
+    / f"aifs2_{EXPERIMENT_KEY}_{INIT[:8]}"
 )
 
 LAT_MIN = 5.0

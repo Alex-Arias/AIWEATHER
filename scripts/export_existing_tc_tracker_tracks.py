@@ -59,6 +59,15 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--experiment-slug",
+        default=None,
+        help=(
+            "Persistent operational experiment directory slug. "
+            "Defaults to the normalized storm name."
+        ),
+    )
+
+    parser.add_argument(
         "--reference-init",
         default=None,
         help=(
@@ -151,13 +160,35 @@ def storm_slug(name):
     )
 
 
+def operational_slug(storm_name, experiment_slug=None):
+    """Resolve the operational directory slug."""
+    if experiment_slug is None:
+        return storm_slug(storm_name)
+
+    slug = experiment_slug.strip()
+
+    if not slug or not all(
+        character.islower()
+        or character.isdigit()
+        or character == "_"
+        for character in slug
+    ):
+        raise ValueError(
+            "--experiment-slug must contain only lowercase "
+            "letters, digits, and underscores."
+        )
+
+    return slug
+
+
 def native_reference_path(
     *,
     storm_name,
     init,
     model,
+    experiment_slug=None,
 ):
-    slug = storm_slug(storm_name)
+    slug = operational_slug(storm_name, experiment_slug)
 
     return (
         Path("results")
@@ -174,8 +205,9 @@ def previous_tracker_reference_path(
     init,
     model,
     tracker_name,
+    experiment_slug=None,
 ):
-    slug = storm_slug(storm_name)
+    slug = operational_slug(storm_name, experiment_slug)
 
     return (
         Path("results")
@@ -335,11 +367,12 @@ def remove_stale_products(
     init,
     model,
     tracker_name,
+    experiment_slug=None,
 ):
     output_dir = (
         Path("results")
         / "operational"
-        / f"{storm_slug(storm_name)}_{init}"
+        / f"{operational_slug(storm_name, experiment_slug)}_{init}"
         / model
     )
 
@@ -378,6 +411,12 @@ def main():
         )
 
     init = args.init
+
+    experiment_slug = operational_slug(
+        args.storm_name,
+        args.experiment_slug,
+    )
+
     forecasts = get_forecasts(init)
 
     tracker_functions = {
@@ -395,6 +434,7 @@ def main():
     )
     print("=" * 76)
     print("Storm          :", args.storm_name)
+    print("Experiment slug:", experiment_slug)
     print("Initialization :", init)
     print("Device         :", args.device)
     print(
@@ -476,6 +516,7 @@ def main():
                         storm_name=args.storm_name,
                         init=init,
                         model=model,
+                        experiment_slug=experiment_slug,
                     )
                 )
 
@@ -489,6 +530,7 @@ def main():
                         init=args.reference_init,
                         model=model,
                         tracker_name=tracker_name,
+                        experiment_slug=experiment_slug,
                     )
                 )
 
@@ -503,6 +545,7 @@ def main():
                             storm_name=args.storm_name,
                             init=init,
                             model=model,
+                            experiment_slug=experiment_slug,
                         )
                     )
                     association_method = (
@@ -583,6 +626,7 @@ def main():
                     init=init,
                     model=model,
                     tracker_name=tracker_name,
+                    experiment_slug=experiment_slug,
                 )
 
                 for path in removed:
@@ -624,7 +668,7 @@ def main():
                 Path("results")
                 / "operational"
                 / (
-                    f"{storm_slug(args.storm_name)}_"
+                    f"{experiment_slug}_"
                     f"{init}"
                 )
                 / model
@@ -673,6 +717,8 @@ def main():
                     int(selected.path_id),
                 "storm_name":
                     args.storm_name,
+                "experiment_slug":
+                    experiment_slug,
                 "selection_method":
                     association_method,
                 "reference_init":
@@ -767,7 +813,7 @@ def main():
         Path("results")
         / "operational"
         / (
-            f"{storm_slug(args.storm_name)}_"
+            f"{experiment_slug}_"
             f"tracker_detection_summary_{init}.csv"
         )
     )

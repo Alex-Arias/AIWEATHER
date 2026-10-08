@@ -39,10 +39,37 @@ def test_operational_wave_output_key_uses_slug():
     text = source()
 
     assert '''STORM_KEY = (
-        f"{storm_slug(args.storm)}_"
+        f"{CASE.get('experiment_slug', storm_slug(args.storm))}_"
         f"{args.init[:8]}"
     )
 ''' in text
+
+
+def test_operational_wave_supports_experiment_slug():
+    text = source()
+
+    assert '"--experiment-slug"' in text
+    assert "experiment_slug=args.experiment_slug" in text
+    assert '"experiment_slug": experiment_key,' in text
+    assert 'f"{experiment_key}_{init}"' in text
+
+
+def test_operational_wave_preserves_storm_identity():
+    text = source()
+
+    assert '"storm_name": storm_key.replace("_", " ").title(),' in text
+    assert '"storm_slug": storm_key,' in text
+    assert '"experiment_slug": experiment_key,' in text
+
+
+def test_operational_wave_preserves_default_slug():
+    text = source()
+
+    assert '''experiment_key = (
+        storm_key
+        if experiment_slug is None
+        else experiment_slug
+    )''' in text
 
 
 def test_operational_product_filenames_use_slug():

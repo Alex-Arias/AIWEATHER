@@ -62,6 +62,7 @@ DOMAINS = {
     "Polo": (-125.0, -90.0, 8.0, 34.0),
     "Rachel": (-125.0, -90.0, 5.0, 30.0),
     "INVEST 92E": (-120.0, -90.0, 5.0, 35.0),
+    "Simon": (-120.0, -90.0, 5.0, 35.0),
 }
 
 # Forecast-cycle line styles.
@@ -91,10 +92,22 @@ def cycle_linestyle(cycle_index):
     ]
 
 
-def track_path(storm, model, tracker, init):
+def track_path(
+    storm,
+    model,
+    tracker,
+    init,
+    experiment_slug=None,
+):
+    slug = (
+        storm.lower().replace(" ", "_")
+        if experiment_slug is None
+        else experiment_slug
+    )
+
     base = (
         Path("results/operational")
-        / f"{storm.lower().replace(chr(32), chr(95))}_{init}"
+        / f"{slug}_{init}"
         / model
     )
 
@@ -106,12 +119,19 @@ def track_path(storm, model, tracker, init):
     return base / filename
 
 
-def load_track(storm, model, tracker, init):
+def load_track(
+    storm,
+    model,
+    tracker,
+    init,
+    experiment_slug=None,
+):
     path = track_path(
         storm,
         model,
         tracker,
         init,
+        experiment_slug=experiment_slug,
     )
 
     if not path.exists():
@@ -183,7 +203,30 @@ def main():
         help="Optional output PNG path.",
     )
 
+    parser.add_argument(
+        "--experiment-slug",
+        default=None,
+        help=(
+            "Persistent operational experiment directory slug. "
+            "Defaults to the normalized storm name."
+        ),
+    )
+
     args = parser.parse_args()
+
+    if args.experiment_slug is not None:
+        slug = args.experiment_slug
+
+        if not slug or not all(
+            character.islower()
+            or character.isdigit()
+            or character == "_"
+            for character in slug
+        ):
+            raise ValueError(
+                "--experiment-slug must contain only lowercase "
+                "letters, digits, and underscores."
+            )
 
     init_times = []
 
@@ -299,6 +342,7 @@ def main():
                         model,
                         tracker,
                         init,
+                        experiment_slug=args.experiment_slug,
                     )
 
                     if df is None:

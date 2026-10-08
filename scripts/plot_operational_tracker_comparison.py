@@ -62,6 +62,7 @@ DOMAINS = {
     "Polo": (-125.0, -90.0, 8.0, 34.0),
     "Rachel": (-125.0, -90.0, 5.0, 30.0),
     "INVEST 92E": (-125.0, -90.0, 5.0, 30.0),
+    "Simon": (-125.0, -90.0, 5.0, 30.0),
 }
 
 
@@ -73,8 +74,18 @@ def storm_slug(name):
     )
 
 
-def track_path(storm, model, tracker, init):
-    slug = storm_slug(storm)
+def track_path(
+    storm,
+    model,
+    tracker,
+    init,
+    experiment_slug=None,
+):
+    slug = (
+        storm_slug(storm)
+        if experiment_slug is None
+        else experiment_slug
+    )
 
     base = (
         Path("results/operational")
@@ -90,12 +101,19 @@ def track_path(storm, model, tracker, init):
     return base / filename
 
 
-def load_track(storm, model, tracker, init):
+def load_track(
+    storm,
+    model,
+    tracker,
+    init,
+    experiment_slug=None,
+):
     path = track_path(
         storm,
         model,
         tracker,
         init,
+        experiment_slug=experiment_slug,
     )
 
     if not path.exists():
@@ -167,7 +185,30 @@ def main():
         help="Optional output PNG path.",
     )
 
+    parser.add_argument(
+        "--experiment-slug",
+        default=None,
+        help=(
+            "Persistent experiment directory slug. "
+            "Defaults to the normalized storm name."
+        ),
+    )
+
     args = parser.parse_args()
+
+    if args.experiment_slug is not None:
+        slug = args.experiment_slug
+
+        if not slug or not all(
+            character.islower()
+            or character.isdigit()
+            or character == "_"
+            for character in slug
+        ):
+            raise ValueError(
+                "--experiment-slug must contain only lowercase "
+                "letters, digits, and underscores."
+            )
 
     try:
         init_time = datetime.strptime(
@@ -269,6 +310,7 @@ def main():
                     model,
                     tracker,
                     args.init,
+                    experiment_slug=args.experiment_slug,
                 )
 
                 if df is None:

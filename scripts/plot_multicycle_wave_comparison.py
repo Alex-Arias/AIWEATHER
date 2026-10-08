@@ -18,7 +18,7 @@ import pandas as pd
 
 DEFAULT_STORMS = ("Odalys", "Polo")
 WAVE_ROOT = Path("results/waves")
-INIT_HOUR_UTC = 12
+# Initialization timestamps are read from diagnostic case_id.
 
 
 def parse_args():
@@ -38,11 +38,38 @@ def parse_args():
         ),
     )
 
+    parser.add_argument(
+        "--experiment-slug",
+        default=None,
+        help=(
+            "Persistent experiment directory slug for a "
+            "single-storm comparison. Defaults to the "
+            "normalized storm name."
+        ),
+    )
+
     return parser.parse_args()
 
 
 ARGS = parse_args()
 STORMS = tuple(ARGS.storms)
+
+EXPERIMENT_SLUG = ARGS.experiment_slug
+
+if EXPERIMENT_SLUG is not None:
+    if len(STORMS) != 1:
+        raise ValueError(
+            "--experiment-slug requires exactly one storm."
+        )
+
+    if not EXPERIMENT_SLUG or not all(
+        character in "abcdefghijklmnopqrstuvwxyz0123456789_"
+        for character in EXPERIMENT_SLUG
+    ):
+        raise ValueError(
+            "Experiment slug must contain only lowercase "
+            "letters, digits, and underscores."
+        )
 
 
 def discover_cases():
@@ -64,10 +91,16 @@ def discover_cases():
     }
 
     for storm in STORMS:
-        storm_lower = storm.lower()
+        storm_lower = storm.lower().replace(" ", "_")
+
+        directory_slug = (
+            EXPERIMENT_SLUG
+            if EXPERIMENT_SLUG is not None
+            else storm_lower
+        )
 
         pattern = (
-            f"aifs2_{storm_lower}_"
+            f"aifs2_{directory_slug}_"
             "[0-9][0-9][0-9][0-9]"
             "[0-9][0-9][0-9][0-9]"
         )
@@ -88,21 +121,88 @@ def discover_cases():
             except ValueError:
                 continue
 
-            diagnostics = directory / (
-                f"aifs2_{storm_lower}_"
-                "wave_diagnostics.csv"
-            )
+            diagnostic_candidates = [
+                directory / (
+                    f"aifs2_{directory_slug}_"
+                    "wave_diagnostics.csv"
+                ),
+                directory / (
+                    f"aifs2_{storm_lower}_"
+                    "wave_diagnostics.csv"
+                ),
+            ]
 
-            if not diagnostics.is_file():
+            existing_diagnostics = list(dict.fromkeys(
+                candidate
+                for candidate in diagnostic_candidates
+                if candidate.is_file()
+            ))
+
+            if not existing_diagnostics:
                 continue
 
-            init = date + pd.Timedelta(
-                hours=INIT_HOUR_UTC
+            if len(existing_diagnostics) > 1:
+                raise ValueError(
+                    "Ambiguous wave diagnostics in "
+                    f"{directory}: {existing_diagnostics}"
+                )
+
+            diagnostics = existing_diagnostics[0]
+
+            metadata = pd.read_csv(
+                diagnostics,
+                usecols=["case_id"],
             )
+
+            case_ids = (
+                metadata["case_id"]
+                .dropna()
+                .astype(str)
+                .unique()
+            )
+
+            if len(case_ids) != 1:
+                raise ValueError(
+                    "Expected one unique case_id in "
+                    f"{diagnostics}; found {list(case_ids)}"
+                )
+
+            case_id = case_ids[0]
+
+            prefix = f"{directory_slug}_"
+
+            if not case_id.startswith(prefix):
+                raise ValueError(
+                    "Unexpected case_id in "
+                    f"{diagnostics}: {case_id!r}"
+                )
+
+            timestamp_string = case_id[len(prefix):]
+
+            try:
+                init = pd.to_datetime(
+                    timestamp_string,
+                    format="%Y%m%dT%H%M%S",
+                    errors="raise",
+                )
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "Invalid initialization timestamp in "
+                    f"{diagnostics}: {case_id!r}"
+                ) from exc
 
             cycle_key = init.strftime(
                 "%Y%m%dT%H%M%S"
             )
+
+            if (
+                timestamp_string != cycle_key
+                or init.strftime("%Y%m%d") != date_string
+            ):
+                raise ValueError(
+                    "Initialization timestamp does not match "
+                    f"the wave directory: {diagnostics}"
+                )
 
             discovered[storm][cycle_key] = {
                 "init": init.strftime(
@@ -432,9 +532,13 @@ fig.suptitle(
 )
 
 
-storm_slug = "_".join(
-    storm.lower()
-    for storm in STORMS
+storm_slug = (
+    EXPERIMENT_SLUG
+    if EXPERIMENT_SLUG is not None
+    else "_".join(
+        storm.lower()
+        for storm in STORMS
+    )
 )
 
 output = Path(
