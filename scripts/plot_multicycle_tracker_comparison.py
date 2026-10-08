@@ -61,6 +61,7 @@ DOMAINS = {
     "Odalys": (-140.0, -110.0, 8.0, 34.0),
     "Polo": (-125.0, -90.0, 8.0, 34.0),
     "Rachel": (-125.0, -90.0, 5.0, 30.0),
+    "INVEST 92E": (-120.0, -90.0, 5.0, 35.0),
 }
 
 # Forecast-cycle line styles.
@@ -93,7 +94,7 @@ def cycle_linestyle(cycle_index):
 def track_path(storm, model, tracker, init):
     base = (
         Path("results/operational")
-        / f"{storm.lower()}_{init}"
+        / f"{storm.lower().replace(chr(32), chr(95))}_{init}"
         / model
     )
 
@@ -225,6 +226,8 @@ def main():
         squeeze=False,
     )
 
+    loaded_track_count = 0
+
     for row, storm in enumerate(storms):
         (
             lon_min,
@@ -301,6 +304,7 @@ def main():
                     if df is None:
                         continue
 
+                    loaded_track_count += 1
                     color = MODEL_COLORS[model]
 
                     ax.plot(
@@ -480,6 +484,14 @@ def main():
         parents=True,
         exist_ok=True,
     )
+
+    if loaded_track_count == 0:
+        plt.close(fig)
+        raise RuntimeError(
+            "No tracks loaded. Check storm names and input paths."
+        )
+
+    print(f"Loaded tracks: {loaded_track_count}")
 
     fig.savefig(
         output,

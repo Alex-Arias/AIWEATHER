@@ -94,3 +94,77 @@ def test_rachel_plotting_domain():
         5.0,
         30.0,
     )
+
+
+def test_invest_92e_track_path_native():
+    path = MODULE.track_path(
+        "INVEST 92E",
+        "graphcast",
+        "native",
+        "20261006T120000",
+    )
+
+    assert path == Path(
+        "results/operational/"
+        "invest_92e_20261006T120000/"
+        "graphcast/"
+        "graphcast_track.csv"
+    )
+
+
+def test_invest_92e_track_path_wuduan():
+    path = MODULE.track_path(
+        "INVEST 92E",
+        "aifs2",
+        "wuduan",
+        "20261007T120000",
+    )
+
+    assert path == Path(
+        "results/operational/"
+        "invest_92e_20261007T120000/"
+        "aifs2/"
+        "aifs2_wuduan_track.csv"
+    )
+
+
+def test_invest_92e_plotting_domain():
+    assert MODULE.DOMAINS["INVEST 92E"] == (
+        -120.0,
+        -90.0,
+        5.0,
+        35.0,
+    )
+
+
+def test_empty_multicycle_plot_raises(tmp_path, monkeypatch):
+    import sys
+
+    import matplotlib
+    import pytest
+
+    matplotlib.use("Agg")
+
+    monkeypatch.chdir(tmp_path)
+
+    output = tmp_path / "empty_comparison.png"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(SCRIPT),
+            "--inits",
+            "20261006T120000",
+            "20261007T120000",
+            "--storms",
+            "INVEST 92E",
+            "--output",
+            str(output),
+        ],
+    )
+
+    with pytest.raises(RuntimeError, match="No tracks loaded"):
+        MODULE.main()
+
+    assert not output.exists()
