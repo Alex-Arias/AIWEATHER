@@ -12,16 +12,18 @@ not rerun a tracker and does not use IBTrACS.
 """
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+import numpy as np
 import pandas as pd
 
 from aiweather.plotting.tracks import normalize_longitude
+from tc_translation_speed import calculate_translation_speed
 
 
 TRACKERS = [
@@ -42,6 +44,13 @@ MODEL_COLORS = {
     "aifs2": "C1",
     "pangu3": "C2",
     "pangu6": "C3",
+}
+
+DATE_LABEL_OFFSETS = {
+    "graphcast": (5, 7),
+    "aifs2": (5, -12),
+    "pangu3": (-32, 7),
+    "pangu6": (-32, -12),
 }
 
 MODEL_LABELS = {
@@ -194,6 +203,27 @@ def main():
         ),
     )
 
+    parser.add_argument(
+        "--show-utc-dates",
+        action="store_true",
+        help="Annotate 24-hour track markers with UTC dates.",
+    )
+
+    parser.add_argument(
+        "--show-translation-speed",
+        action="store_true",
+        help="Add translation-speed diagnostics below the maps.",
+    )
+
+    parser.add_argument(
+        "--focused-domain",
+        action="store_true",
+        help=(
+            "Use a focused geographic domain for Simon. "
+            "Other storms retain their default domains."
+        ),
+    )
+
     args = parser.parse_args()
 
     if args.experiment_slug is not None:
@@ -236,15 +266,46 @@ def main():
 
     projection = ccrs.PlateCarree()
 
-    fig, axes = plt.subplots(
-        len(storms),
-        len(TRACKERS),
-        figsize=(17, 10),
-        subplot_kw={
-            "projection": projection,
-        },
-        squeeze=False,
-    )
+    if args.show_translation_speed:
+        fig = plt.figure(
+            figsize=(18, 11),
+        )
+
+        grid = fig.add_gridspec(
+            len(storms) + 1,
+            len(TRACKERS),
+            height_ratios=[2.6] * len(storms) + [1.5],
+            hspace=0.18,
+        )
+
+        axes = np.array([
+            [
+                fig.add_subplot(
+                    grid[row, col],
+                    projection=projection,
+                )
+                for col in range(len(TRACKERS))
+            ]
+            for row in range(len(storms))
+        ], dtype=object)
+
+        speed_axes = [
+            fig.add_subplot(grid[-1, col])
+            for col in range(len(TRACKERS))
+        ]
+
+    else:
+        fig, axes = plt.subplots(
+            len(storms),
+            len(TRACKERS),
+            figsize=(17, 10),
+            subplot_kw={
+                "projection": projection,
+            },
+            squeeze=False,
+        )
+
+        speed_axes = None
 
     for row, storm in enumerate(storms):
         (
@@ -253,6 +314,12 @@ def main():
             lat_min,
             lat_max,
         ) = DOMAINS[storm]
+
+        if args.focused_domain and storm == "Simon":
+            lon_min = -110.0
+            lon_max = -99.0
+            lat_min = 13.0
+            lat_max = 26.0
 
         for col, tracker in enumerate(TRACKERS):
             ax = axes[row, col]
@@ -320,6 +387,35 @@ def main():
                     continue
 
                 color = MODEL_COLORS[model]
+
+                if args.show_translation_speed:
+                    speed_df = calculate_translation_speed(df)
+
+                    speed_axes[col].plot(
+                        speed_df["lead_time_hours"],
+                        speed_df["translation_speed_kmh"],
+                        color=color,
+                        linewidth=1.8,
+                        marker=".",
+                        markersize=4,
+                        label=MODEL_LABELS[model],
+                    )
+
+                    if tracker == "native":
+                        high_speed = speed_df[
+                            speed_df["translation_speed_kmh"] > 30.0
+                        ]
+
+                        if not high_speed.empty:
+                            speed_axes[col].scatter(
+                                high_speed["lead_time_hours"],
+                                high_speed["translation_speed_kmh"],
+                                facecolors="none",
+                                edgecolors=color,
+                                s=65,
+                                linewidths=1.5,
+                                zorder=8,
+                            )
 
                 ax.plot(
                     df["longitude_plot"],
@@ -401,6 +497,35 @@ def main():
                         zorder=4,
                     )
 
+                    if args.show_utc_dates:
+                        for _, point in marker_df.iterrows():
+                            lead_hour = float(
+                                point["lead_time_hours"]
+                            )
+
+                            valid_time = (
+                                init_time
+                                + timedelta(hours=lead_hour)
+                            )
+
+                            date_label = valid_time.strftime(
+                                "%d %b"
+                            )
+
+                            ax.annotate(
+                                date_label,
+                                xy=(
+                                    point["longitude_plot"],
+                                    point["latitude"],
+                                ),
+                                xytext=DATE_LABEL_OFFSETS[model],
+                                textcoords="offset points",
+                                fontsize=6.5,
+                                color=color,
+                                transform=projection,
+                                zorder=7,
+                            )
+
             if row == 0:
                 ax.set_title(
                     f"{TRACKER_LABELS[tracker]} tracker",
@@ -441,6 +566,31 @@ def main():
                     zorder=10,
                 )
 
+    if speed_axes is not None:
+        for col, tracker in enumerate(TRACKERS):
+            speed_ax = speed_axes[col]
+
+            speed_ax.set_title(
+                f"{TRACKER_LABELS[tracker]} translation speed",
+                fontsize=11,
+            )
+
+            speed_ax.set_xlabel(
+                "Forecast lead time (h)"
+            )
+
+            speed_ax.set_ylabel(
+                "Translation speed (km/h)"
+            )
+
+            speed_ax.grid(
+                True,
+                alpha=0.3,
+            )
+
+            speed_ax.set_xlim(left=0)
+            speed_ax.set_ylim(bottom=0)
+
     handles = [
         Line2D(
             [0],
@@ -466,7 +616,10 @@ def main():
     fig.text(
         0.5,
         0.008,
-        "Markers every 24 h; larger circle indicates first tracker detection.",
+        (
+            "Map markers every 24 h; larger circle = first detection. "
+            "Open speed circles: Native >30 km/h (diagnostic only)."
+        ),
         ha="center",
         va="bottom",
         fontsize=9,
@@ -483,14 +636,24 @@ def main():
         y=0.975,
     )
 
-    fig.subplots_adjust(
-        left=0.07,
-        right=0.985,
-        bottom=0.10,
-        top=0.88,
-        wspace=0.08,
-        hspace=0.16,
-    )
+    if args.show_translation_speed:
+        fig.subplots_adjust(
+            left=0.07,
+            right=0.985,
+            bottom=0.12,
+            top=0.88,
+            wspace=0.12,
+            hspace=0.30,
+        )
+    else:
+        fig.subplots_adjust(
+            left=0.07,
+            right=0.985,
+            bottom=0.10,
+            top=0.88,
+            wspace=0.08,
+            hspace=0.16,
+        )
 
     if args.output is None:
         output = (
