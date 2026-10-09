@@ -12,16 +12,24 @@ not rerun a tracker and does not use IBTrACS.
 """
 
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import numpy as np
 from matplotlib.lines import Line2D
 import pandas as pd
 
 from aiweather.plotting.tracks import normalize_longitude
+try:
+    from scripts.tc_translation_speed import calculate_translation_speed
+except ModuleNotFoundError as exc:
+    if exc.name != "scripts":
+        raise
+    from tc_translation_speed import calculate_translation_speed
 
 
 TRACKERS = [
@@ -64,6 +72,22 @@ DOMAINS = {
     "INVEST 92E": (-120.0, -90.0, 5.0, 35.0),
     "Simon": (-120.0, -90.0, 5.0, 35.0),
 }
+
+
+
+DATE_LABEL_OFFSETS = {
+    "graphcast": (5, 7),
+    "aifs2": (5, -12),
+    "pangu3": (-32, 7),
+    "pangu6": (-32, -12),
+}
+
+
+FOCUSED_DOMAINS = {
+    "Simon": (-110.0, -99.0, 13.0, 26.0),
+    "INVEST 92E": (-110.0, -99.0, 13.0, 26.0),
+}
+
 
 # Forecast-cycle line styles.
 #
@@ -172,6 +196,45 @@ def load_track(
     return df
 
 
+
+def prepare_translation_speed(track, init_time):
+    """
+    Calculate cyclone translation speed and absolute UTC times.
+
+    Parameters
+    ----------
+    track : pandas.DataFrame
+        Existing operational tracker positions.
+
+    init_time : datetime
+        Forecast initialization in UTC.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Track positions with translation_speed_kmh and valid_time.
+
+    Notes
+    -----
+    Translation speed represents horizontal displacement
+    between successive forecast positions divided by the
+    actual elapsed time.
+
+    It is not maximum sustained wind speed.
+    """
+    result = calculate_translation_speed(track)
+
+    result["valid_time"] = (
+        pd.Timestamp(init_time)
+        + pd.to_timedelta(
+            result["lead_time_hours"],
+            unit="h",
+        )
+    )
+
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=(
@@ -210,6 +273,24 @@ def main():
             "Persistent operational experiment directory slug. "
             "Defaults to the normalized storm name."
         ),
+    )
+
+    parser.add_argument(
+        "--show-utc-dates",
+        action="store_true",
+        help="Annotate track positions with UTC dates.",
+    )
+
+    parser.add_argument(
+        "--show-translation-speed",
+        action="store_true",
+        help="Add translation-speed panels using absolute UTC time.",
+    )
+
+    parser.add_argument(
+        "--focused-domain",
+        action="store_true",
+        help="Use a focused geographic domain when available.",
     )
 
     args = parser.parse_args()
@@ -259,17 +340,59 @@ def main():
 
     projection = ccrs.PlateCarree()
 
-    fig, axes = plt.subplots(
-        len(storms),
-        len(TRACKERS),
-        figsize=(17, 10),
-        subplot_kw={
-            "projection": projection,
-        },
-        squeeze=False,
-    )
+    if args.show_translation_speed:
+        fig = plt.figure(figsize=(18, 11))
+
+        grid = fig.add_gridspec(
+            nrows=2 * len(storms),
+            ncols=len(TRACKERS),
+            height_ratios=[
+                value
+                for _ in storms
+                for value in (2.6, 1.2)
+            ],
+            hspace=0.22,
+            wspace=0.12,
+        )
+
+        axes = np.empty(
+            (len(storms), len(TRACKERS)),
+            dtype=object,
+        )
+
+        speed_axes = np.empty(
+            (len(storms), len(TRACKERS)),
+            dtype=object,
+        )
+
+        for row in range(len(storms)):
+            for col in range(len(TRACKERS)):
+                axes[row, col] = fig.add_subplot(
+                    grid[2 * row, col],
+                    projection=projection,
+                )
+
+                speed_axes[row, col] = fig.add_subplot(
+                    grid[2 * row + 1, col],
+                )
+
+    else:
+        fig, axes = plt.subplots(
+            len(storms),
+            len(TRACKERS),
+            figsize=(17, 10),
+            subplot_kw={
+                "projection": projection,
+            },
+            squeeze=False,
+        )
+
+        speed_axes = None
 
     loaded_track_count = 0
+
+    speed_times = []
+    speed_values = []
 
     for row, storm in enumerate(storms):
         (
@@ -277,7 +400,11 @@ def main():
             lon_max,
             lat_min,
             lat_max,
-        ) = DOMAINS[storm]
+        ) = (
+            FOCUSED_DOMAINS.get(storm, DOMAINS[storm])
+            if args.focused_domain
+            else DOMAINS[storm]
+        )
 
         for col, tracker in enumerate(TRACKERS):
             ax = axes[row, col]
@@ -321,6 +448,17 @@ def main():
                 linestyle="--",
             )
 
+            if args.focused_domain:
+                from matplotlib.ticker import FixedLocator
+
+                gridlines.xlocator = FixedLocator(
+                    np.arange(
+                        np.ceil(lon_min / 2.0) * 2.0,
+                        lon_max + 0.01,
+                        2.0,
+                    )
+                )
+
             gridlines.top_labels = False
             gridlines.right_labels = False
 
@@ -361,6 +499,57 @@ def main():
                         transform=projection,
                         zorder=3,
                     )
+
+                    if args.show_translation_speed:
+                        speed_df = prepare_translation_speed(
+                            df,
+                            init_times[cycle_index],
+                        )
+
+                        valid_speed = speed_df[
+                            "translation_speed_kmh"
+                        ].notna()
+
+                        if valid_speed.any():
+                            speed_times.extend(
+                                speed_df.loc[
+                                    valid_speed, "valid_time"
+                                ].tolist()
+                            )
+
+                            speed_values.extend(
+                                speed_df.loc[
+                                    valid_speed,
+                                    "translation_speed_kmh",
+                                ].tolist()
+                            )
+
+                        speed_ax = speed_axes[row, col]
+
+                        speed_ax.plot(
+                            speed_df["valid_time"],
+                            speed_df["translation_speed_kmh"],
+                            color=color,
+                            linestyle=linestyle,
+                            linewidth=1.5,
+                            alpha=0.85,
+                        )
+
+                        if tracker == "native":
+                            flagged = speed_df.loc[
+                                speed_df["translation_speed_kmh"] > 30.0
+                            ]
+
+                            if not flagged.empty:
+                                speed_ax.scatter(
+                                    flagged["valid_time"],
+                                    flagged["translation_speed_kmh"],
+                                    facecolors="none",
+                                    edgecolors=color,
+                                    s=45,
+                                    linewidths=1.2,
+                                    zorder=6,
+                                )
 
                     # First available tracker point.
                     first = df.iloc[0]
@@ -406,6 +595,47 @@ def main():
                             zorder=4,
                         )
 
+                    # UTC calendar dates for the latest cycle only.
+                    # Existing 24-hour markers remain unchanged.
+                    if (
+                        args.show_utc_dates
+                        and cycle_index == len(args.inits) - 1
+                        and model == "aifs2"
+                    ):
+                        init_time = init_times[cycle_index]
+
+                        for _, point in df.iterrows():
+                            valid_time = (
+                                init_time
+                                + timedelta(
+                                    hours=float(point["lead_time_hours"])
+                                )
+                            )
+
+                            if (
+                                valid_time.hour != 0
+                                or valid_time.minute != 0
+                            ):
+                                continue
+
+                            dx, dy = DATE_LABEL_OFFSETS[model]
+
+                            ax.annotate(
+                                valid_time.strftime("%d %b"),
+                                xy=(
+                                    point["longitude_plot"],
+                                    point["latitude"],
+                                ),
+                                xycoords=projection._as_mpl_transform(ax),
+                                xytext=(dx, dy),
+                                textcoords="offset points",
+                                fontsize=7,
+                                color=color,
+                                alpha=0.9,
+                                annotation_clip=True,
+                                zorder=6,
+                            )
+
             if row == 0:
                 ax.set_title(
                     f"{TRACKER_LABELS[tracker]} tracker",
@@ -427,6 +657,75 @@ def main():
                     fontsize=14,
                     fontweight="bold",
                 )
+
+    if args.show_translation_speed:
+        for row in range(len(storms)):
+            for col, tracker in enumerate(TRACKERS):
+                speed_ax = speed_axes[row, col]
+
+                speed_ax.set_title(
+                    f"{TRACKER_LABELS[tracker]} translation speed",
+                    fontsize=10,
+                )
+
+                speed_ax.set_ylabel(
+                    "Speed (km/h)",
+                    fontsize=9,
+                )
+
+                speed_ax.set_xlabel(
+                    "Valid time (UTC)",
+                    fontsize=9,
+                )
+
+                speed_ax.grid(
+                    True,
+                    alpha=0.3,
+                    linestyle="--",
+                )
+
+                speed_ax.xaxis.set_major_locator(
+                    mdates.DayLocator(interval=1)
+                )
+
+                speed_ax.xaxis.set_major_formatter(
+                    mdates.DateFormatter("%d %b")
+                )
+
+                speed_ax.tick_params(
+                    axis="x",
+                    labelrotation=35,
+                    labelsize=8,
+                )
+
+                speed_ax.tick_params(
+                    axis="y",
+                    labelsize=8,
+                )
+
+                speed_ax.set_ylim(bottom=0)
+
+    if args.show_translation_speed and speed_times:
+        time_min = min(speed_times)
+        time_max = max(speed_times)
+
+        speed_max = max(speed_values)
+
+        common_speed_max = max(
+            10.0,
+            speed_max * 1.08,
+        )
+
+        for speed_ax in speed_axes.flat:
+            speed_ax.set_xlim(
+                time_min,
+                time_max,
+            )
+
+            speed_ax.set_ylim(
+                0,
+                common_speed_max,
+            )
 
     # ---------------------------------------------------------
     # Model legend: color
@@ -500,21 +799,38 @@ def main():
     fig.text(
         0.5,
         0.002,
-        "Color = forecast model; line style = forecast cycle; "
-        "markers every 24 h.",
+        (
+            "Color = forecast model; line style = forecast cycle; "
+            "track markers every 24 h. "
+            "Speed panels use absolute UTC valid time. "
+            "Open circles: Native speed >30 km/h "
+            "(diagnostic only)."
+            if args.show_translation_speed
+            else
+            "Color = forecast model; line style = forecast cycle; "
+            "markers every 24 h."
+        ),
         ha="center",
         va="bottom",
         fontsize=9,
     )
 
-    fig.subplots_adjust(
-        left=0.07,
-        right=0.985,
-        bottom=0.19,
-        top=0.88,
-        wspace=0.08,
-        hspace=0.16,
-    )
+    if args.show_translation_speed:
+        fig.subplots_adjust(
+            left=0.07,
+            right=0.985,
+            bottom=0.19,
+            top=0.88,
+        )
+    else:
+        fig.subplots_adjust(
+            left=0.07,
+            right=0.985,
+            bottom=0.19,
+            top=0.88,
+            wspace=0.08,
+            hspace=0.16,
+        )
 
     if args.output is None:
         output = (
