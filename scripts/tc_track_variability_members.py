@@ -216,10 +216,18 @@ def main():
 
         for model in args.models:
 
+            tracker_name = args.tracker.lower()
+
+            track_filename = (
+                f"{model}_track.csv"
+                if tracker_name == "native"
+                else f"{model}_{tracker_name}_track.csv"
+            )
+
             track_file = (
                 directory
                 / model
-                / f"{model}_{args.tracker}_track.csv"
+                / track_filename
             )
 
             if not track_file.exists():
