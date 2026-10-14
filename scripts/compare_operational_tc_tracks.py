@@ -186,8 +186,13 @@ def discover_tracks(
 ) -> dict[str, dict]:
     """Discover operational track/provenance pairs."""
     provenance_paths = sorted(
-        input_dir.rglob(
+        path
+        for path in input_dir.rglob(
             "*_track.provenance.json"
+        )
+        if isinstance(
+            load_provenance(path).get("forecast"),
+            dict,
         )
     )
 
