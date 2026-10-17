@@ -79,6 +79,121 @@ def validate_spectral_dataset(ds):
         )
 
 
+
+def directional_quality_diagnostics(
+    sin_values,
+    cos_values,
+    low_magnitude_threshold=0.5,
+    minimum_cells=3,
+):
+    """
+    Calculate spatial quality diagnostics for bulk wave direction.
+
+    These diagnostics describe the spatial consistency of bulk
+    mean-wave-direction components, not spectral-band direction.
+
+    The low-magnitude threshold is experimental and does not
+    represent a validated physical quality threshold.
+    """
+
+    sin_values = np.asarray(
+        sin_values,
+        dtype=float,
+    )
+
+    cos_values = np.asarray(
+        cos_values,
+        dtype=float,
+    )
+
+    if sin_values.shape != cos_values.shape:
+        raise ValueError(
+            "Directional component shapes must match"
+        )
+
+    if (
+        not np.isfinite(low_magnitude_threshold)
+        or low_magnitude_threshold <= 0
+    ):
+        raise ValueError(
+            "low_magnitude_threshold must be finite and positive"
+        )
+
+    if (
+        isinstance(minimum_cells, (bool, np.bool_))
+        or not isinstance(minimum_cells, (int, np.integer))
+        or minimum_cells < 1
+    ):
+        raise ValueError(
+            "minimum_cells must be a positive integer"
+        )
+
+    paired_finite = (
+        np.isfinite(sin_values)
+        & np.isfinite(cos_values)
+    )
+
+    sin_valid = sin_values[paired_finite]
+    cos_valid = cos_values[paired_finite]
+
+    magnitude = np.hypot(
+        sin_valid,
+        cos_valid,
+    )
+
+    n_finite = int(magnitude.size)
+
+    low_magnitude = (
+        magnitude < low_magnitude_threshold
+    )
+
+    fraction_low = (
+        float(np.mean(low_magnitude))
+        if n_finite
+        else np.nan
+    )
+
+    # Exclude effectively zero vectors from normalization.
+    usable = magnitude > 1e-6
+
+    n_usable = int(np.count_nonzero(usable))
+
+    if n_usable:
+
+        unit_sin = (
+            sin_valid[usable]
+            / magnitude[usable]
+        )
+
+        unit_cos = (
+            cos_valid[usable]
+            / magnitude[usable]
+        )
+
+        resultant = float(
+            np.hypot(
+                np.mean(unit_sin),
+                np.mean(unit_cos),
+            )
+        )
+
+        resultant = float(
+            np.clip(resultant, 0.0, 1.0)
+        )
+
+    else:
+        resultant = np.nan
+
+    return {
+        "directional_resultant_length": resultant,
+        "fraction_low_direction_magnitude": fraction_low,
+        "n_valid_direction_cells": n_usable,
+        "directional_qc_supported": bool(
+            n_usable >= minimum_cells
+        ),
+    }
+
+
 def build_spectral_guidance(
     ds,
     radius_km=DEFAULT_RADIUS_KM,
@@ -201,11 +316,25 @@ def build_spectral_guidance(
                 "n_missing_spectral_cells":
                     n_original - n_spectral,
                 "minimum_cells": 3,
+                "directional_resultant_length": np.nan,
+                "fraction_low_direction_magnitude": np.nan,
+                "n_valid_direction_cells": 0,
+                "directional_qc_supported": False,
                 "sampling_supported":
                     bool(n_original >= 3),
                 "spectral_sampling_supported":
                     bool(n_spectral >= 3),
             }
+
+            # Bulk directional QC uses the original valid-cell
+            # mask, independently of spectral-band completeness.
+            if n_original:
+                directional_qc = directional_quality_diagnostics(
+                    sampled["sin_mwd"][original_valid],
+                    sampled["cos_mwd"][original_valid],
+                )
+
+                row.update(directional_qc)
 
             # Initialize all numerical diagnostics.
             for name in SPECTRAL_BANDS:

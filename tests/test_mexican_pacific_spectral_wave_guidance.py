@@ -212,3 +212,103 @@ def test_missing_all_spectral_cells():
         result.n_missing_spectral_cells
         == result.n_original_valid_cells
     ).all()
+
+
+def test_directional_qc_coherent_field():
+
+    ds = make_dataset()
+
+    result = build_spectral_guidance(
+        ds,
+        anchors=ANCHORS,
+    )
+
+    assert np.allclose(
+        result.directional_resultant_length,
+        1.0,
+    )
+
+    assert np.allclose(
+        result.fraction_low_direction_magnitude,
+        0.0,
+    )
+
+    assert (
+        result.n_valid_direction_cells == 9
+    ).all()
+
+    assert result.directional_qc_supported.all()
+
+    # Existing spectral calculations remain unchanged.
+    assert np.allclose(
+        result.swh_mean_m,
+        4.0,
+    )
+
+
+def test_directional_qc_opposing_directions():
+
+    ds = make_dataset()
+
+    # Eight opposing vectors and one zero vector.
+    cos_values = np.array([
+        [1.0, 1.0, 1.0],
+        [1.0, 0.0, -1.0],
+        [-1.0, -1.0, -1.0],
+    ])
+
+    ds["cos_mwd"].values[0, 0] = cos_values
+
+    result = build_spectral_guidance(
+        ds,
+        anchors=ANCHORS,
+    )
+
+    first = result.iloc[0]
+
+    assert np.isclose(
+        first.directional_resultant_length,
+        0.0,
+        atol=1e-10,
+    )
+
+    assert np.isclose(
+        first.fraction_low_direction_magnitude,
+        1.0 / 9.0,
+    )
+
+    assert first.n_valid_direction_cells == 8
+
+    assert bool(first.directional_qc_supported)
+
+
+def test_directional_qc_insufficient_cells():
+
+    ds = make_dataset()
+
+    ds["cos_mwd"].values[0, 0] = 0.0
+
+    ds["cos_mwd"].values[0, 0, 1, 1] = 1.0
+
+    result = build_spectral_guidance(
+        ds,
+        anchors=ANCHORS,
+    )
+
+    first = result.iloc[0]
+
+    assert first.n_valid_direction_cells == 1
+
+    assert not bool(
+        first.directional_qc_supported
+    )
+
+    assert np.isclose(
+        first.fraction_low_direction_magnitude,
+        8.0 / 9.0,
+    )
+
+    assert np.isclose(
+        first.directional_resultant_length,
+        1.0,
+    )
