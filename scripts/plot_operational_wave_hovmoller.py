@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from aiweather.forecast import open_forecast
+from operational_wave_track_qc import filter_native_track
 
 
 # ============================================================
@@ -42,6 +43,19 @@ parser.add_argument(
         "Persistent operational experiment directory slug. "
         "Defaults to the normalized storm name."
     ),
+)
+
+parser.add_argument(
+    "--qc-exclusions",
+    type=Path,
+    default=None,
+    help="Optional CSV of Native-track QC exclusions.",
+)
+
+parser.add_argument(
+    "--no-overwrite",
+    action="store_true",
+    help="Stop if any expected output product already exists.",
 )
 
 args = parser.parse_args()
@@ -127,6 +141,24 @@ REFERENCE_LEADS = [
     216,
     240,
 ]
+
+# Protect all expected products before any output is written.
+if args.no_overwrite:
+    expected_outputs = [
+        OUTPUT_DIR / f"{STORM_KEY}_{INIT}_wave_hovmoller.png",
+        OUTPUT_DIR / f"{STORM_KEY}_{INIT}_wave_hovmoller.pdf",
+        OUTPUT_DIR / f"{STORM_KEY}_{INIT}_wave_radial_profiles.csv",
+    ]
+
+    existing_outputs = [
+        path for path in expected_outputs if path.exists()
+    ]
+
+    if existing_outputs:
+        raise FileExistsError(
+            "Refusing to overwrite existing wave products: "
+            + ", ".join(str(path) for path in existing_outputs)
+        )
 
 OUTPUT_DIR.mkdir(
     parents=True,
@@ -329,6 +361,30 @@ if missing_track_columns:
         + ", ".join(
             sorted(missing_track_columns)
         )
+    )
+
+# Apply QC only when explicitly requested.
+if args.qc_exclusions is not None:
+    if not args.qc_exclusions.is_file():
+        raise FileNotFoundError(
+            f"QC exclusions not found: {args.qc_exclusions}"
+        )
+
+    qc_table = pd.read_csv(args.qc_exclusions)
+
+    original_count = len(track)
+
+    track = filter_native_track(
+        track,
+        qc_table,
+        model="aifs2",
+        init=INIT,
+    )
+
+    print(
+        "Native-track QC:",
+        original_count - len(track),
+        "position(s) excluded",
     )
 
 track = (
@@ -725,12 +781,28 @@ ax.legend(
 
 for lead in REFERENCE_LEADS:
 
-    ax.axvline(
-        lead,
-        linestyle=":",
-        linewidth=0.9,
-        alpha=0.6,
+    if lead_values[0] <= lead <= lead_values[-1]:
+
+        ax.axvline(
+            lead,
+            linestyle=":",
+            linewidth=0.9,
+            alpha=0.6,
+        )
+
+# Restrict the horizontal axis to accepted forecast leads.
+# Adapt the margin to the available forecast sampling interval.
+if len(lead_values) > 1:
+    margin = 0.5 * float(
+        np.median(np.diff(lead_values))
     )
+else:
+    margin = 3.0
+
+ax.set_xlim(
+    float(lead_values[0]) - margin,
+    float(lead_values[-1]) + margin,
+)
 
 
 # ============================================================
