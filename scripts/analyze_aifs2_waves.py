@@ -25,6 +25,7 @@ import pandas as pd
 
 from aiweather.forecast import open_forecast
 from wave_cases import get_case
+from operational_wave_track_qc import filter_native_track
 from wave_centers import (
     load_wave_centers,
     longitude_near_reference,
@@ -76,6 +77,22 @@ parser.add_argument(
     help=(
         "Validate the wave case, forecast, storm track, "
         "and usable lead times without generating products."
+    ),
+)
+
+parser.add_argument(
+    "--qc-exclusions",
+    default=None,
+    help=(
+        "Optional CSV of documented Native-track QC exclusions."
+    ),
+)
+
+parser.add_argument(
+    "--no-overwrite",
+    action="store_true",
+    help=(
+        "Refuse to overwrite existing spatial wave products."
     ),
 )
 
@@ -625,6 +642,43 @@ track = load_wave_centers(
     CASE
 )
 
+if args.qc_exclusions is not None:
+
+    if CENTER_SOURCE != "native":
+        raise RuntimeError(
+            "--qc-exclusions requires Native storm centers"
+        )
+
+    qc_path = Path(args.qc_exclusions)
+
+    if not qc_path.is_file():
+        raise FileNotFoundError(
+            f"QC exclusions file missing: {qc_path}"
+        )
+
+    qc_table = pd.read_csv(qc_path)
+
+    original_count = len(track)
+
+    track = filter_native_track(
+        track,
+        qc_table,
+        model="aifs2",
+        init=INIT,
+    )
+
+    print(
+        "Native-track QC:",
+        original_count - len(track),
+        "position(s) excluded",
+    )
+
+    if track.empty:
+        raise RuntimeError(
+            "No storm centers remain after QC filtering"
+        )
+
+
 
 # ============================================================
 # Operational lead-time discovery
@@ -689,6 +743,41 @@ if args.init is not None:
         )
     )
 
+
+if args.no_overwrite and not args.dry_run:
+
+    planned_outputs = []
+
+    for lead_hours in LEAD_TIMES:
+        prefix = (
+            f"aifs2_{CASE.get('storm_slug', STORM_NAME.lower())}_"
+        )
+
+        planned_outputs.extend([
+            OUTPUT_DIR / f"{prefix}wave_{lead_hours:03d}h.png",
+            OUTPUT_DIR / f"{prefix}wave_{lead_hours:03d}h.pdf",
+        ])
+
+    prefix = (
+        f"aifs2_{CASE.get('storm_slug', STORM_NAME.lower())}_"
+    )
+
+    planned_outputs.extend([
+        OUTPUT_DIR / f"{prefix}wave_diagnostics.csv",
+        OUTPUT_DIR / f"{prefix}storm_relative_swh.png",
+        OUTPUT_DIR / f"{prefix}storm_relative_swh.pdf",
+    ])
+
+    existing_outputs = [
+        path for path in planned_outputs if path.exists()
+    ]
+
+    if existing_outputs:
+        raise RuntimeError(
+            "STOP — Existing spatial wave outputs would be "
+            "overwritten:\n"
+            + "\n".join(str(path) for path in existing_outputs)
+        )
 
 if args.dry_run:
     print()

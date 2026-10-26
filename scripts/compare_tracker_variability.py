@@ -403,7 +403,7 @@ def main():
 
     fig.suptitle(
         f"AIWeather — {args.storm} "
-        "WuDuan vs Vitart Matched-Window Variability\n"
+        f"{args.tracker_a} vs {args.tracker_b} Matched-Window Variability\n"
         f"{start:%d %b %Y %H UTC} – "
         f"{end:%d %b %Y %H UTC}",
         fontsize=16,
@@ -424,7 +424,7 @@ def main():
     figure_path = (
         outdir
         / f"{args.storm.lower()}_cycle{latest_cycle}_"
-          "wuduan_vitart_matched_comparison.png"
+          f"{args.tracker_a}_{args.tracker_b}_matched_comparison.png"
     )
 
     fig.savefig(
